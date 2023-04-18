@@ -397,8 +397,25 @@ function sendReply(threadId, replyText, sheetId, sheetName, row) {
 }
 function onEdit(e) {
   const sheet = e.range.getSheet();
+  const sheetName = e.range.getSheet().getName();
   const checkbox = sheet.getRange("toggleBox");
   
+  var column = e.range.getColumn();
+  var row = e.range.getRow();
+  
+  var balloonsWebhookUrl = 'https://chat.googleapis.com/v1/spaces/AAAAErT1C7U/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=BXAuPG57AIBp7qkurUycOHKzuIYOTajlsnOIiZNxmp4%3D';
+  var cathetersWebhookUrl = 'https://chat.googleapis.com/v1/spaces/AAAAGc0haFE/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=TozYnMjC9kEGLflE0iosbQ17Q8FmljnyCza0qI7rWo4%3D';
+  
+  var webhookUrl = '';
+  
+  if (sheetName === 'Balloons') {
+    webhookUrl = balloonsWebhookUrl;
+  } else if (sheetName === 'Catheters') {
+    webhookUrl = cathetersWebhookUrl;
+  } else {
+    return; // Exit the function if the edited sheet is neither "Balloons" nor "Catheters"
+  }
+
   if (e.range.getA1Notation() === "C1") {
     if (checkbox.isChecked()) {
       sheet.getRange("C1").setBackground("#00FF00"); // green
@@ -416,10 +433,336 @@ function onEdit(e) {
       });
     }
   }
+  
+  if (column === 7 && row >= 10) {
+    var data = e.range.getSheet().getRange(row, 1, 1, 6).getValues()[0];
+    var message = createMessage(data);
+    sendToDiscord(message, webhookUrl);
+  }
 }
 
 function onOpen() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Balloons');
   var checkboxCell = sheet.getRange('C1');
   checkboxCell.setValue(true);
+}
+
+function createNewSheet() {
+  console.time("Total Execution Time");
+  // Get the current sheet
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = ss.getName();
+  var file = DriveApp.getFileById(ss.getId());
+  var parentFolder = file.getParents().next();
+
+  // Extract month number, month name, and year from the sheet title
+  var regex = /^(\d{1,2})\s(\w+)\s(\d{4})\sPD\sSchedule$/;
+  var result = sheetName.match(regex);
+
+  if (!result) {
+    SpreadsheetApp.getUi().alert('Invalid sheet name format.');
+    return;
+  }
+
+  var monthNum = parseInt(result[1], 10);
+  var monthName = result[2];
+  var year = parseInt(result[3], 10);
+
+  // Calculate the next month and year
+  monthNum++;
+  if (monthNum > 12) {
+    monthNum = 1;
+    year++;
+  }
+  monthName = Utilities.formatDate(new Date(year, monthNum - 1), "GMT", "MMMM");
+
+  // Create the new sheet name
+  var newSheetName = monthNum + " " + monthName + " " + year + " PD Schedule";
+
+  // Make a copy of the current sheet
+  var newSheetFile = DriveApp.getFileById(ss.copy(newSheetName).getId());
+  // Move the new sheet to the same folder as the original sheet
+  parentFolder.addFile(newSheetFile);
+  DriveApp.getRootFolder().removeFile(newSheetFile);
+
+  // Get the new sheet URL
+  var url = newSheetFile.getUrl();
+
+  // Access the new sheet as a Spreadsheet object
+  var newSheet = SpreadsheetApp.openById(newSheetFile.getId());
+
+  // Uncheck the checkbox in the new sheet's Balloons tab
+  var newSheetBalloons = newSheet.getSheetByName('Balloons');
+  if (newSheetBalloons) {
+    newSheetBalloons.getRange('C1').setValue(false);
+  } else {
+    SpreadsheetApp.getUi().alert('Balloons tab not found in the new sheet.');
+  }
+
+  // Access the new sheet as a Spreadsheet object
+  var newSheet = SpreadsheetApp.openById(newSheetFile.getId());
+
+  // Call the functions to copy data and clear completed jobs
+console.time("copyDataToNewSheet - Balloons");
+copyDataToNewSheet(newSheet, 'Balloons');
+console.timeEnd("copyDataToNewSheet - Balloons");
+
+console.time("copyDataToNewSheet - Catheters");
+copyDataToNewSheet(newSheet, 'Catheters');
+console.timeEnd("copyDataToNewSheet - Catheters");
+
+
+  var tabs = ['Balloons', 'Catheters', 'Sheaths/Sleeves'];
+
+  for (var i = 0; i < tabs.length; i++) {
+    var tab = tabs[i];
+
+    console.time(tab + " - clearCompletedJobs");
+    clearCompletedJobs(newSheet, tab);
+    console.timeEnd(tab + " - clearCompletedJobs");
+
+    console.time(tab + " - reformatSections");
+    reformatSections(newSheet, tab);
+    console.timeEnd(tab + " - reformatSections");
+  }
+  // Call the new function to prompt user for sending email and opening the new sheet
+  promptToSendEmailAndOpenNewSheet(newSheetFile.getId());
+}
+
+function copyDataToNewSheet(newSheet, sheetName) {
+  var originalSheet = SpreadsheetApp.getActiveSpreadsheet();
+  var originalTab = originalSheet.getSheetByName(sheetName);
+  var newSheetData = newSheet.getSheetByName("Data");
+
+  // Get data from the original sheet in bulk
+  var customerNames = originalTab.getRange("BI8:BI30").getValues();
+  var runRates = originalTab.getRange("BJ8:BJ30").getValues();
+
+  // Set the target range based on the sheetName
+  var targetRange;
+  if (sheetName === 'Balloons') {
+    targetRange = "J2:J18";
+  } else if (sheetName === 'Catheters') {
+    targetRange = "J20:J30";
+  } else {
+    throw new Error('Invalid sheetName provided');
+  }
+
+  // Get data from the new sheet in bulk
+  var targetCustomerNames = newSheetData.getRange(targetRange).getValues();
+
+  for (var i = 0; i < customerNames.length; i++) {
+    var customerName = customerNames[i][0];
+    var runRate = runRates[i][0];
+
+    if (customerName) {
+      for (var j = 0; j < targetCustomerNames.length; j++) {
+        if (customerName === targetCustomerNames[j][0]) {
+          if (runRate) {
+            newSheetData.getRange("K" + (j + (sheetName === 'Balloons' ? 2 : 20))).setValue(runRate);
+          }
+          break;
+        }
+      }
+    }
+  }
+}
+
+function clearCompletedJobs(newSheet, sheetName) {
+  var sheet = newSheet.getSheetByName(sheetName);
+  var range = sheet.getRange(6, 1, sheet.getLastRow() - 5, sheet.getLastColumn());
+  var data = range.getValues();
+
+  var completedRows = [];
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][27] === data[i][6]) { // Compare column AB (index 27) with column G (index 6)
+      completedRows.push(i + 6);
+    }
+  }
+
+  var rangeListString = "";
+  for (var i = 0; i < completedRows.length; i++) {
+    rangeListString += "A" + completedRows[i] + ":C" + completedRows[i] + "," +
+      "D" + completedRows[i] + ":I" + completedRows[i] + "," +
+      "K" + completedRows[i] + ":N" + completedRows[i] + "," +
+      "P" + completedRows[i] + "," +
+      "U" + completedRows[i] + ":V" + completedRows[i] + "," +
+      "Y" + completedRows[i] + ":AC" + completedRows[i] + "," +
+      "AE" + completedRows[i] + "," +
+      "AI" + completedRows[i] + ":AJ" + completedRows[i] + (i < completedRows.length - 1 ? "," : "");
+  }
+  
+  // Split the rangeListString into an array of strings
+  var rangeListArray = rangeListString.split(',');
+
+  if (rangeListArray.length > 0) {
+    var rangeList = sheet.getRangeList(rangeListArray);
+    rangeList.clearContent();
+  }
+}
+
+function reformatSections(newSheet, sheetName) {
+  var sheet = newSheet.getSheetByName(sheetName);
+  var columnsToMove = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P", "U", "V", "Y", "Z", "AA", "AB", "AC", "AE", "AI", "AJ"];
+  var numRows = sheet.getLastRow();
+  var dataRange = sheet.getRange(8, 1, numRows - 7, sheet.getLastColumn());
+  var data = dataRange.getValues();
+
+  for (var rowIndex = 0; rowIndex < data.length;) {
+    // Find section header
+    if (data[rowIndex][2] === "Job Number") {
+      var startOfSection = rowIndex;
+      var endOfSection = data.length;
+
+      // Find end of the section
+      for (var searchIndex = startOfSection + 1; searchIndex < data.length; searchIndex++) {
+        if (data[searchIndex][2] === "Job Number") {
+          endOfSection = searchIndex;
+          break;
+        }
+      }
+
+      // Iterate through rows within the section
+      for (var rowInSection = startOfSection + 1; rowInSection < endOfSection; rowInSection++) {
+        if (!isEmptyRow(data[rowInSection], columnsToMove)) {
+          var emptyRowIndex = -1;
+
+          // Find the highest empty row within the section
+          for (var searchEmpty = startOfSection + 1; searchEmpty < rowInSection; searchEmpty++) {
+            if (isEmptyRow(data[searchEmpty], columnsToMove)) {
+              emptyRowIndex = searchEmpty;
+              break;
+            }
+          }
+
+          if (emptyRowIndex >= 0) {
+            // Move the data to the empty row
+            moveDataBetweenRows(sheet, rowInSection + 8, emptyRowIndex + 8, columnsToMove); // Updated from dataSheet to sheet
+            // Update the data array
+            data[emptyRowIndex] = data[rowInSection].slice(0);
+            data[rowInSection] = new Array(data[rowInSection].length).fill("");
+          }
+        }
+      }
+      // Move to the next section
+      rowIndex = endOfSection;
+    } else {
+      rowIndex++;
+    }
+  }
+}
+
+function isEmptyRow(rowData, columnsToCheck) {
+  return columnsToCheck.every(function(column) {
+    var columnIndex = columnNameToIndex(column);
+    return !rowData[columnIndex];
+  });
+}
+
+function columnNameToIndex(columnName) {
+  var columnIndex = 0;
+  var columnNameLength = columnName.length;
+
+  for (var i = 0; i < columnNameLength; i++) {
+    columnIndex *= 26;
+    columnIndex += columnName.charCodeAt(i) - 'A'.charCodeAt(0) + 1;
+  }
+
+  return columnIndex - 1;
+}
+
+function moveDataBetweenRows(sheet, sourceRow, targetRow, columns) {
+  for (var i = 0; i < columns.length; i++) {
+    var sourceCell = sheet.getRange(sourceRow, columnNameToIndex(columns[i]) + 1);
+    var targetCell = sheet.getRange(targetRow, columnNameToIndex(columns[i]) + 1);
+    targetCell.setValue(sourceCell.getValue());
+
+    // Clear the source cell content
+    sourceCell.clearContent();
+  }
+}
+
+function moveDataWithinSection(emptyRows, dataSheet, sectionStart, sectionEnd) {
+  var columnsToMove = [
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P",
+    "U", "V", "Y", "Z", "AA", "AB", "AC", "AE", "AI", "AJ"
+  ];
+
+  for (var i = sectionStart + 1; i < sectionEnd; i++) {
+    if (emptyRows.length === 0) {
+      break;
+    }
+        var firstEmptyRow = emptyRows.shift();
+    if (i > firstEmptyRow) {
+      for (var j = 0; j < columnsToMove.length; j++) {
+        var sourceRange = dataSheet.getRange(columnsToMove[j] + (i + 8));
+        var targetRange = dataSheet.getRange(columnsToMove[j] + (firstEmptyRow + 8));
+
+        // If sourceRange has data validation, copy the validation rules to targetRange
+        if (["B", "H", "P"].includes(columnsToMove[j])) {
+          var validationRule = sourceRange.getDataValidation();
+          if (validationRule) {
+            targetRange.setDataValidation(validationRule);
+          }
+        }
+
+        // Move the data
+        targetRange.setValue(sourceRange.getValue());
+        sourceRange.clearContent();
+      }
+    }
+  }
+}
+
+
+function promptToSendEmailAndOpenNewSheet(newSheetId) {
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert('Send email to the PD team with the new spreadsheet link?', ui.ButtonSet.YES_NO);
+
+  if (response === ui.Button.YES) {
+    sendEmail(newSheetId);
+    var secondResponse = ui.alert('Email has been sent. Would you like to open the new sheet?', ui.ButtonSet.YES_NO);
+
+    if (secondResponse === ui.Button.YES) {
+      openNewSheet(newSheetId);
+    }
+  } else {
+    var secondResponse = ui.alert('Email has NOT been sent. You will need to manually email the team later. Would you like to open the new sheet?', ui.ButtonSet.YES_NO);
+
+    if (secondResponse === ui.Button.YES) {
+      openNewSheet(newSheetId);
+    }
+  }
+}
+
+function openNewSheet(newSheetId) {
+  var newSheetUrl = SpreadsheetApp.openById(newSheetId).getUrl();
+  var htmlOutput = HtmlService.createHtmlOutput('<html><script>window.open("' + newSheetUrl + '", "_blank"); window.close();</script></html>')
+    .setWidth(10)
+    .setHeight(10);
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Opening new sheet...');
+}
+
+function sendEmail(newSheetId) {
+  var newSheet = SpreadsheetApp.openById(newSheetId);
+  var newSheetId = PropertiesService.getScriptProperties().getProperty('newSheetId');
+  // Get the recipient email addresses from the Data tab, N3:N50
+  var dataSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Data');
+  var emailRange = dataSheet.getRange("N3:N50");
+  var recipientEmails = emailRange.getValues().flat().filter(function(email) { return email !== ''; }).join(', ');
+
+  // Get the month from the new sheet's title
+  var newSheetName = newSheet.getName();
+  var month = newSheetName.split(" ")[1]; // Assuming the format is "1 January 2023 PD Schedule"
+
+  // Set up the subject and body
+  var subject = "New PD Schedule - " + month;
+  var newSheetUrl = newSheet.getUrl();
+  var body = "Hello, Team!\n\n" +
+             "A new PD schedule has been created for the month of " + month + ". You can find the link below:\n\n" +
+             newSheetUrl + "\n\n" +
+             "Reminder to check the schedule and ensure accuracy of details and completion of required documents. Thank you!";
+
+  // Send the email
+  GmailApp.sendEmail(recipientEmails, subject, body);
 }
