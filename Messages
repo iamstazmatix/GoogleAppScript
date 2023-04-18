@@ -397,25 +397,8 @@ function sendReply(threadId, replyText, sheetId, sheetName, row) {
 }
 function onEdit(e) {
   const sheet = e.range.getSheet();
-  const sheetName = e.range.getSheet().getName();
   const checkbox = sheet.getRange("toggleBox");
   
-  var column = e.range.getColumn();
-  var row = e.range.getRow();
-  
-  var balloonsWebhookUrl = 'https://chat.googleapis.com/v1/spaces/AAAAErT1C7U/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=BXAuPG57AIBp7qkurUycOHKzuIYOTajlsnOIiZNxmp4%3D';
-  var cathetersWebhookUrl = 'https://chat.googleapis.com/v1/spaces/AAAAGc0haFE/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=TozYnMjC9kEGLflE0iosbQ17Q8FmljnyCza0qI7rWo4%3D';
-  
-  var webhookUrl = '';
-  
-  if (sheetName === 'Balloons') {
-    webhookUrl = balloonsWebhookUrl;
-  } else if (sheetName === 'Catheters') {
-    webhookUrl = cathetersWebhookUrl;
-  } else {
-    return; // Exit the function if the edited sheet is neither "Balloons" nor "Catheters"
-  }
-
   if (e.range.getA1Notation() === "C1") {
     if (checkbox.isChecked()) {
       sheet.getRange("C1").setBackground("#00FF00"); // green
@@ -432,12 +415,6 @@ function onEdit(e) {
         }
       });
     }
-  }
-  
-  if (column === 7 && row >= 10) {
-    var data = e.range.getSheet().getRange(row, 1, 1, 6).getValues()[0];
-    var message = createMessage(data);
-    sendToDiscord(message, webhookUrl);
   }
 }
 
@@ -766,3 +743,4 @@ function sendEmail(newSheetId) {
   // Send the email
   GmailApp.sendEmail(recipientEmails, subject, body);
 }
+
