@@ -1,0 +1,180 @@
+// Update this constant with the new Google Sheet link every month
+const balloonsSheetUrl = "https://docs.google.com/spreadsheets/d/1iia6pcSwlEsDVetEt0P_WYqo91fO3MhBywKFvl1FqHs/edit?pli=1#gid=488390916";
+// Call monitorOverallSheet with handleColumnABUpdate
+monitorOverallSheet(handleColumnABUpdate);
+
+function monitorOverallSheet(handleColumnABUpdate) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const overallSheet = ss.getSheetByName('Overall');
+  const numRows = overallSheet.getLastRow();
+
+  // Get the range for the column F in the "Overall" tab
+  const columnFRange = overallSheet.getRange(2, 6, numRows - 1, 1);
+  const columnFValues = columnFRange.getValues();
+
+  for (let row = 2; row <= numRows; row++) {
+    const workOrderNumber = overallSheet.getRange(row, 2).getValue();
+    if (workOrderNumber) {
+      const dataToCopy = overallSheet.getRange(row, 7, 1, 3).getValues();
+      updateBalloonsSheet(workOrderNumber, dataToCopy, handleColumnABUpdate);
+    }
+  }
+
+  // Get the range for the edited cell
+  const editedRange = columnFRange.offset(0, 0, 1, 1);
+  const editedValues = editedRange.getValues();
+
+  // Check if the edited cell value was changed from "Open" to "Setup"
+  if (editedValues[0][0] === "Setup" && columnFValues[row - 2][0] === "Open") {
+    const balloonsSheet = SpreadsheetApp.openByUrl(balloonsSheetUrl);
+    const balloonsTab = balloonsSheet.getSheetByName('Balloons');
+    const jobNumber = overallSheet.getRange(row, 2).getValue();
+    const balloonsNumRows = balloonsTab.getLastRow();
+
+    for (let row = 2; row <= balloonsNumRows; row++) {
+      const balloonsJobNumber = balloonsTab.getRange(row, 3).getValue();
+      if (jobNumber === balloonsJobNumber) {
+        // Check if a date is already present in column Y
+        const dateColumnY = balloonsTab.getRange(row, 25).getValue();
+        if (!dateColumnY) {
+          const currentDate = new Date();
+          balloonsTab.getRange(row, 25).setValue(currentDate);
+        }
+        break;
+      }
+    }
+  }
+
+  // Check if the edited cell value was changed to "Setup/On Hold"
+if (editedValues[0][0] === "Setup/On Hold" && columnFValues[row - 2][0] === "Setup") {
+const reason = Browser.inputBox("Please provide a reason for putting the work order on hold.");
+if (reason) {
+overallSheet.getRange(row, 13).setValue(reason);
+const jobNumber = overallSheet.getRange(row, 3).getValue();
+const customer = overallSheet.getRange(row, 2).getValue();
+const description = overallSheet.getRange(row, 6).getValue();
+const replyText = `*Status:* Work Order ${jobNumber} (${customer} ${description}) setup has been put on hold. - ${reason}`;
+sendReply({
+threadId: jobNumber,
+replyText: replyText,
+technicianEmail: '',
+engineerEmail: '',
+sheetId: '',
+sheetName: '',
+row: '',
+WEBHOOK_URL: ''
+});
+}
+}
+
+// Check if the edited cell value was changed from "Setup/On Hold" to "Setup"
+if (editedValues[0][0] === "Setup" && columnFValues[row - 2][0] === "Setup/On Hold") {
+const jobNumber = overallSheet.getRange(row, 3).getValue();
+const customer = overallSheet.getRange(row, 2).getValue();
+const description = overallSheet.getRange(row, 6).getValue();
+const replyText = `*Status:* Work Order ${jobNumber} (${customer} ${description}) setup has been resumed.`;
+sendReply({
+threadId: jobNumber,
+replyText: replyText,
+technicianEmail: '',
+engineerEmail: '',
+sheetId: '',
+sheetName: '',
+row: '',
+WEBHOOK_URL: ''
+});
+}
+
+// Check if the edited cell value was changed from "Setup" to "Running"
+if (editedValues[0][0] === "Running" && columnFValues[row - 2][0] === "Setup") {
+const balloonsSheet = SpreadsheetApp.openByUrl(balloonsSheetUrl);
+const balloonsTab = balloonsSheet.getSheetByName('Balloons');
+const jobNumber = overallSheet.getRange(row, 3).getValue();
+const balloonsNumRows = balloonsTab.getLastRow();
+for (let row = 2; row <= balloonsNumRows; row++) {
+  const balloonsJobNumber = balloonsTab.getRange(row, 3).getValue();
+  if (jobNumber === balloonsJobNumber) {
+    // Check if a date is already present in columns Z and AA
+    const dateColumnZ = balloonsTab.getRange(row, 26).getValue();
+    const dateColumnAA = balloonsTab.getRange(row, 27).getValue();
+    if (!dateColumnZ) {
+      const currentDate = new Date();
+      balloonsTab.getRange(row, 26).setValue(currentDate);
+    }
+    if (!dateColumnAA) {
+      const currentDate = new Date();
+      balloonsTab.getRange(row, 27).setValue(currentDate);
+    }
+    break;
+  }
+}
+}
+
+// Check if the edited cell value was changed to "Running/On Hold"
+if (editedValues[0][0] === "Running/On Hold") {
+const reason = Browser.inputBox("Please provide a reason for putting the work order on hold.");
+if (reason) {
+overallSheet.getRange(row, 13).setValue(reason);
+const jobNumber = overallSheet.getRange(row, 3).getValue();
+const customer = overallSheet.getRange(row, 2).getValue();
+const description = overallSheet.getRange(row, 6).getValue();
+const replyText = `*Update:* Work Order ${jobNumber} (${customer} ${description}) has been put on hold. - ${reason}`;
+sendReply({
+threadId: jobNumber,
+replyText: replyText,
+technicianEmail: '',
+engineerEmail: '',
+sheetId: '',
+sheetName: '',
+row: '',
+WEBHOOK_URL: ''
+});
+}
+}
+}
+
+// Function to handle the "on edit" trigger
+function handleColumnABUpdate(sheet, range) {
+// Call monitorOverallSheet
+monitorOverallSheet(handleColumnABUpdate);
+}
+
+// Function to send a reply using a webhook
+function sendReply(options) {
+const { threadId, replyText, technicianEmail, engineerEmail, sheetId, sheetName, row, WEBHOOK_URL } = options;
+
+const triggerLink = 'https://script.google.com/macros/s/1_q4LwpjZHQLoNVC3KvJdp5jklNfxL_vgx2mDyzJXBWuvhwabQsBL1Y7g/exec?sheetId=${sheetId}&sheetName=${sheetName}&row=${row}&column=25';
+const data = {
+"text": '${replyText}',
+"thread": {
+"name": threadId
+}
+};
+
+const requestOptions = {
+method: 'post',
+contentType: 'application/json',
+payload: JSON.stringify(data)
+};
+
+UrlFetchApp.fetch(WEBHOOK_URL, requestOptions);
+}
+
+function updateBalloonsSheet(workOrderNumber, dataToCopy, handleColumnABUpdate) {
+  const balloonsSheet = SpreadsheetApp.openByUrl(balloonsSheetUrl);
+  const balloonsTab = balloonsSheet.getSheetByName('Balloons');
+  const balloonsNumRows = balloonsTab.getLastRow();
+
+  for (let row = 2; row <= balloonsNumRows; row++) {
+    const balloonsWorkOrderNumber = balloonsTab.getRange(row, 3).getValue();
+    if (workOrderNumber === balloonsWorkOrderNumber) {
+      balloonsTab.getRange(row, 28, 1, 1).setValues([[dataToCopy[0][0]]]);
+      balloonsTab.getRange(row, 29, 1, 1).setValues([[dataToCopy[0][1]]]);
+      balloonsTab.getRange(row, 31, 1, 1).setValues([[dataToCopy[0][2]]]);
+
+      // Call handleColumnABUpdate() after updating the sheet
+      const range = balloonsTab.getRange(row, 28); // Column AB
+      handleColumnABUpdate(balloonsTab, range);
+    }
+  }
+}
