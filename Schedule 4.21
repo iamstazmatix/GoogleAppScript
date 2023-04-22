@@ -1,0 +1,898 @@
+function onEditInstallable(e) {
+  const sheetNames = ['Balloons', 'Catheters'];
+  const sheet = sheetNames.includes(e.range.getSheet().getName()) ? e.range.getSheet() : null;
+
+  if (!sheet) {
+    return;
+  }
+
+  let WEBHOOK_URL = getWebhookUrl(e.range.getSheet().getName());
+  const watchColumn1 = 9; // Column I (A=1, B=2, C=3, ..., I=9)
+  const watchColumn2 = 13; // Column M (A=1, B=2, C=3, ..., M=13)
+  const watchColumnU = 21; // Column U
+  const watchColumnY = 25; // Column Y (A=1, B=2, C=3, ..., Y=25)
+  const watchColumnZ = 26; // Column Z (A=1, B=2, C=3, ..., Z=26)
+  const watchColumnAA = 27; // Column AA
+  const watchColumnAB = 28; // Column AB
+  const watchColumnV = 22; // Column V (A=1, B=2, C=3, ..., V=22)
+  const anotherSheetUrl = 'https://docs.google.com/spreadsheets/d/1pdB6GM5WkYhlfcuq2_RzM5qh6WwLj0w--zK4kadHPQo/edit#gid=1522203497';
+
+  const checkbox = sheet.getRange("toggleBox");
+
+if (!checkbox.isChecked()) {
+  return;
+}
+
+  if (e.range.getColumn() === watchColumn1 && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
+      console.log('Column I edited and was previously empty');
+      const row = e.range.getRow();
+      const workOrder = sheet.getRange(row, 3).getValue(); // Column C
+      const customer = sheet.getRange(row, 2).getValue(); // Column B
+      const description = sheet.getRange(row, 6).getValue(); // Column F
+
+      const dataSheet = e.source.getSheetByName('Data');
+      const materialHandlerName = dataSheet.getRange('C4').getValue();
+
+      const [firstName, lastName] = materialHandlerName.split(' ');
+      const materialHandlerEmail = `${firstName}.${lastName}@confluentmedical.com`;
+
+      const threadId = sendChatMessage(workOrder, customer, description, materialHandlerName, materialHandlerEmail, WEBHOOK_URL);
+
+
+      sheet.getRange(row, 1).setValue(threadId);
+      sheet.getRange(row, watchColumn1).setValue(new Date());
+    }
+
+  if (e.range.getColumn() === watchColumn2 && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
+   const row = e.range.getRow();
+    const threadId = sheet.getRange(row, 1).getValue();
+    const workOrder = sheet.getRange(row, 3).getValue(); // Column C
+    const customer = sheet.getRange(row, 2).getValue(); // Column B
+    const description = sheet.getRange(row, 6).getValue(); // Column F
+
+    const technicianName = sheet.getRange(row, 24).getValue(); // Column X
+    const engineerName = sheet.getRange(row, 23).getValue(); // Column W
+
+    const [techFirstName, techLastName] = technicianName.split(' ');
+    const technicianEmail = `${techFirstName}.${techLastName}@confluentmedical.com`;
+
+    const [engFirstName, engLastName] = engineerName.split(' ');
+    const engineerEmail = `${engFirstName}.${engLastName}@confluentmedical.com`;
+
+    const replyText = `*Update:* Work Order ${workOrder} (${customer} ${description}) has been kitted and delivered and is ready for set up. Please update the schedule when beginning set up. @${technicianEmail} @${engineerEmail}`;
+
+    sheet.getRange(row, watchColumn2).setValue(new Date());
+
+
+  sendReply({
+  threadId: threadId,
+  replyText: replyText,
+  technicianEmail: technicianEmail,
+  engineerEmail: engineerEmail,
+  sheetId: e.source.getId(),
+  sheetName: e.range.getSheet().getName(),
+  row: row,
+  WEBHOOK_URL: WEBHOOK_URL
+});
+  }
+
+  if (e.range.getColumn() === watchColumnY && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
+    const row = e.range.getRow();
+    const threadId = sheet.getRange(row, 1).getValue();
+    const workOrder = sheet.getRange
+    (row, 3).getValue(); // Column C
+    const customer = sheet.getRange(row, 2).getValue(); // Column B
+    const description = sheet.getRange(row, 6).getValue(); // Column F
+
+    const replyText = `*Update:* Work Order ${workOrder} (${customer} ${description}) has begun the set up process.`;
+
+    sheet.getRange(row, watchColumnY).setValue(new Date());
+
+
+    sendReply({
+  threadId: threadId,
+  replyText: replyText,
+  sheetId: e.source.getId(),
+  sheetName: e.range.getSheet().getName(),
+  row: row,
+  WEBHOOK_URL: WEBHOOK_URL
+});
+  }
+
+if (e.range.getColumn() === watchColumnZ && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
+  const row = e.range.getRow();
+  const threadId = sheet.getRange(row, 1).getValue();
+  const workOrder = sheet.getRange(row, 3).getValue(); // Column C
+  const customer = sheet.getRange(row, 2).getValue(); // Column B
+  const description = sheet.getRange(row, 6).getValue(); // Column F
+
+  const dataSheet = e.source.getSheetByName('Data');
+  const leadName = dataSheet.getRange('C3').getValue();
+
+  const [leadFirstName, leadLastName] = leadName.split(' ');
+  const leadEmail = `${leadFirstName}.${leadLastName}@confluentmedical.com`;
+
+  const sheetName = e.range.getSheet().getName();
+  let replyText;
+
+  if (sheetName === 'Balloons') {
+    replyText = `*Update:* Work Order ${workOrder} (${customer} ${description}) has completed set up. Please verify Pre-Qualification Report before running. @${leadEmail}`;
+  } else if (sheetName === 'Catheters') {
+    replyText = `*Update:* Work Order ${workOrder} (${customer} ${description}) has completed set up for Catheters. [Your custom message for Catheters] @${leadEmail}`;
+  }
+
+  sheet.getRange(row, watchColumnZ).setValue(new Date());
+
+
+  sendReply({
+    threadId: threadId,
+    replyText: replyText,
+    leadEmail: leadEmail,
+    sheetId: e.source.getId(),
+    sheetName: sheetName,
+    row: row,
+    WEBHOOK_URL: WEBHOOK_URL
+  });
+}
+
+  if (e.range.getColumn() === watchColumnAA && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
+  const row = e.range.getRow();
+  const threadId = sheet.getRange(row, 1).getValue();
+  const workOrder = sheet.getRange(row, 3).getValue(); // Column C
+  const customer = sheet.getRange(row, 2).getValue(); // Column B
+  const description = sheet.getRange(row, 6).getValue(); // Column F
+
+  const dataSheet = e.source.getSheetByName('Data');
+  const leadName = dataSheet.getRange('C3').getValue();
+
+  const [leadFirstName, leadLastName] = leadName.split(' ');
+  const leadEmail = `${leadFirstName}.${leadLastName}@confluentmedical.com`;
+
+  const replyText = `*Update:* Work Order ${workOrder} (${customer} ${description}) has passed the Pre-Qualification Report review. The work order is now running.`;
+
+  sheet.getRange(row, watchColumnAA).setValue(new Date());
+
+
+  sendReply({
+    threadId: threadId,
+    replyText: replyText,
+    leadEmail: leadEmail,
+    sheetId: e.source.getId(),
+    sheetName: e.range.getSheet().getName(),
+    row: row,
+    WEBHOOK_URL: WEBHOOK_URL
+  });
+}
+
+if (e.range.getColumn() === watchColumnAB && sheetNames.includes(e.range.getSheet().getName())) {
+  const row = e.range.getRow();
+  const qtyPassed = e.range.getValue();
+  const qtyRequested = sheet.getRange(row, 7).getValue(); // Column G
+
+  if (qtyPassed === qtyRequested) {
+    const currentDate = new Date().toLocaleDateString(); // Get current date in MM/DD/YYYY format
+    sheet.getRange(row, 35).setValue(currentDate); // Set the value of Column AI to the current date
+  const threadId = sheet.getRange(row, 1).getValue();
+  const workOrder = sheet.getRange(row, 3).getValue(); // Column C
+  const customer = sheet.getRange(row, 2).getValue(); // Column B
+  const description = sheet.getRange(row, 6).getValue(); // Column F
+
+  const technicianName = sheet.getRange(row, 24).getValue(); // Column X
+  const engineerName = sheet.getRange(row, 23).getValue(); // Column W
+
+  const [techFirstName, techLastName] = technicianName.split(' ');
+  const technicianEmail = `${techFirstName}.${techLastName}@confluentmedical.com`;
+
+  const [engFirstName, engLastName] = engineerName.split(' ');
+  const engineerEmail = `${engFirstName}.${engLastName}@confluentmedical.com`;
+    
+    // Set the value of Column AI to the current date
+    sheet.getRange(row, 35).setValue(currentDate);
+
+    sendReply({
+      threadId: threadId,
+      replyText: `*Update:* Work Order ${workOrder} (${customer} ${description}) has reached the final quantity.`,
+      technicianEmail: technicianEmail,
+      engineerEmail: engineerEmail,
+      sheetId: e.source.getId(),
+      sheetName: e.range.getSheet().getName(),
+      row: row,
+      WEBHOOK_URL: WEBHOOK_URL
+    });
+  
+  const data = {
+  "thread": {
+    "name": threadId
+  },
+  "cards": [
+    {
+      "sections": [
+        {
+          "header": "Inspector Tasks",
+          "widgets": [
+            {
+              "textParagraph": {
+                "text": "1. Complete all pending in-process testing."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "2. Bag and label any retainers, record on the inspection sheet."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "3. Review all In-Process Inspection Data, print and sign final inspection report."
+              }
+            }
+          ]
+        },
+        {
+          "header": "Technician/Engineer Tasks",
+          "widgets": [
+            {
+              "textParagraph": {
+                "text": `@${technicianEmail} @${engineerEmail}`
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "1. Review Final Inspection Report and Sign."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "2. Update \"Date Delivered to Inspection Rack\" in Schedule."
+              }
+            }
+          ]
+        },
+        {
+          "widgets": [
+            {
+              "textParagraph": {
+                "text": "Once Complete: Place Work Order on the production rack assigned to this machine."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(data)
+  };
+
+  UrlFetchApp.fetch(WEBHOOK_URL, options);
+  }
+}
+
+if (e.range.getColumn() === watchColumnU && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
+  const row = e.range.getRow();
+  const workOrder = sheet.getRange(row, 3).getValue(); // Column C
+  const customer = sheet.getRange(row, 2).getValue(); // Column B
+  const description = sheet.getRange(row, 6).getValue(); // Column F
+  const threadId = sheet.getRange(row, 1).getValue();
+
+  const dataSheet = e.source.getSheetByName('Data');
+  const leadName = dataSheet.getRange('C3').getValue();
+  const [leadFirstName, leadLastName] = leadName.split(' ');
+  const leadEmail = `${leadFirstName}.${leadLastName}@confluentmedical.com`;
+
+  const technicianName = sheet.getRange(row, 24).getValue(); // Column X
+  const engineerName = sheet.getRange(row, 23).getValue(); // Column W
+
+  const [techFirstName, techLastName] = technicianName.split(' ');
+  const technicianEmail = `${techFirstName}.${techLastName}@confluentmedical.com`;
+
+  const [engFirstName, engLastName] = engineerName.split(' ');
+  const engineerEmail = `${engFirstName}.${engLastName}@confluentmedical.com`;
+
+  sheet.getRange(row, watchColumnU).setValue(new Date());
+
+
+  sendReply({
+    threadId: threadId,
+    replyText: `*Update:* Work Order ${workOrder} (${customer} ${description}) is ready for final review. @${leadEmail} (Note: If the Lead is absent, please notify supervisor for completion.)`,
+    technicianEmail: technicianEmail,
+    engineerEmail: engineerEmail,
+    sheetId: e.source.getId(),
+    sheetName: e.range.getSheet().getName(),
+    row: row,
+    WEBHOOK_URL: WEBHOOK_URL
+  });
+
+  const data = {
+  "thread": {
+    "name": threadId
+  },
+  "cards": [
+    {
+      "sections": [
+        {
+          "header": "<font color='black'><b>Lead (Supervisor) Tasks</b>",
+          "widgets": [
+            {
+              "textParagraph": {
+                "text": "<u>1. Review LHR</u>\n   a. Verify all fields are filled out with the proper revision\n   b. Ensure any empty fields are appropriately marked with N/A\n   c. Verify proper Good Documentation Practices.\n   d. Sign and Date if necessary"
+                }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>2. Review Balloon Anneal Log (FM-147)</u>\n   a. Confirm Header Information Matches Work Order.\n        • Lot Number\n        • Balloon Part Number\n        • Revision\n        • Job Quantity\n        • Balloon Size\n        • BFM#\n   b. Review Each Line to Verify Information Recorded Accurately:\n        • Oven Asset - Confirm # was recorded & calibrated.\n        • Date\n        • Timer Asset - Confirm # was recorded & calibrated.\n        • Time In - Must have AM/PM\n        • Duration Time - Verify Duration Time with Balloon Drawing\n        • Time Out - Must be Time In + Duration Time and have AM/PM\n        • QTY\n        • Oven Temp - Verify Oven Temp with Balloon Drawing\n        • Initials - Verify Line Clearance (FM-055) matches operators on date."
+                }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>3. Review Inspection Sheet (FM-022)</u>\n   a. Confirm Header Information Matches Work Order.\n        • Lot Number\n        • Balloon Part Number\n        • Revision\n        • Job Quantity\n        • Customer\n        • Balloon Size\n        • BFM#\n        • Cell # (Should be N/A)\n        • Interval QTY (Should Match Machine Tag, verify with IP-180)\n   b. Review Each Line of the Inspection Sheet\n        • Confirm the Math in Each Column is Accurate\n          - Total Fail (Sum of Row Rejects - MB)\n          - Run Total Fail (Current Row Total Fail + Prev. Row Run Total Fail)\n          - Total Pass (Row Total Blown - Row Total Fail)\n          - Run Total Pass (Current Row Total Pass + Prev. Row Run Total Pass)\n       • Operator & Inspector Initials\n          - Confirm Line Clearance (FM-055) completed date entry was made.\n  c. Verify Inspection Totals match Anneal Record totals"
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>4. Review Balloon In-Process Data Sheet FM-024</u>\n   a. Verify asset numbers and calibration status in “Test Equipment Record” fields.\n   b. Verify operator initials and date for every operator performing testing. (Can verify this when verifying Final Inspection Report print outs.)"
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>5. Verify that PQ Report is present and has all signatures.</u>\n  a. Any writing follows Good Documentation Practices."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>6. Verify that final inspection report is present and has all signatures</u>\n  a. Any writing follows Good Documentation Practices."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>6. Verify that final inspection report is present and has all signatures</u>\n   a. Verify that any operator signing a printout has also signed FM-024.\n  b. Any writing follows Good Documentation Practices."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>7. Verify Pick List</u>\n  a. Follows Good Documentation Practices."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>8. Verify Work Order is present (OC Traveler report style)</u>\n  a. Any writing follows Good Documentation Practices."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>9. Verify Balloon Labels are correct and have necessary information.</u>\n  a. Lot Number.\n  b. Part Number.\n  c. Revision.\n  d. Customer Part Number.\n  e. Customer Revision\n  f. PO Number (Formatted PO#####)\n  g. SO Number.\n  h. Bag QTY\n        • Confirm bag was verified on FM-183. "
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>10. Verify presence of correct sales order (if necessary)</u>\n  a. Sales Order matches SO listed on Traveler and Labels."
+              }
+            },
+          ]
+        },
+        {
+          "widgets": [
+            {
+              "textParagraph": {
+                "text": `Once all tasks are completed, deliver the complete work order to QC and update Column V.`
+              }
+            },
+          ]
+        },
+
+      ]
+    }
+  ]
+};
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(data)
+  };
+
+  UrlFetchApp.fetch(WEBHOOK_URL, options);
+}
+
+if (e.range.getColumn() === watchColumnV && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
+  const row = e.range.getRow();
+  const threadId = sheet.getRange(row, 1).getValue();
+  const workOrder = sheet.getRange(row, 3).getValue(); // Column C
+  const customer = sheet.getRange(row, 2).getValue(); // Column B
+  const description = sheet.getRange(row, 6).getValue(); // Column F
+
+  const dataSheet = e.source.getSheetByName('Data');
+  const leadName = dataSheet.getRange('C3').getValue();
+
+  const [leadFirstName, leadLastName] = leadName.split(' ');
+  const leadEmail = `${leadFirstName}.${leadLastName}@confluentmedical.com`;
+
+  const replyText = `*Update:* Work Order ${workOrder} (${customer} ${description}) has been reviewed and delivered to QC. `;
+
+  sheet.getRange(row, watchColumnV).setValue(new Date());
+
+
+  sendReply({
+    threadId: threadId,
+    replyText: replyText,
+    technicianEmail: leadEmail,
+    engineerEmail: '',
+    sheetId: e.source.getId(),
+    sheetName: e.range.getSheet().getName(),
+    row: row,
+    WEBHOOK_URL: WEBHOOK_URL
+  });
+
+  // New functionality
+  const anotherSheet = SpreadsheetApp.openByUrl(anotherSheetUrl);
+  const targetSheet = anotherSheet.getSheetByName('Overall');
+  const targetLastRow = targetSheet.getLastRow();
+
+  for (let i = 2; i <= targetLastRow; i++) {
+    const targetWorkOrder = targetSheet.getRange(i, 2).getValue(); // Column B
+    if (workOrder === targetWorkOrder) {
+      targetSheet.getRange(i, 2).setValue(''); // Clear Column B
+      targetSheet.getRange(i, 3).setValue(''); // Clear Column C
+      targetSheet.getRange(i, 4).setValue('');
+      targetSheet.getRange(i, 5).setValue(''); // Clear Column E
+      targetSheet.getRange(i, 6).setValue('Open'); // Clear Column E
+      targetSheet.getRange(i, 13).setValue(''); // Clear Column M
+
+      // Get the BFM number
+      const bfmNumber = sheet.getRange(row, 1).getValue(); // Column A
+      const bfmSheet = anotherSheet.getSheetByName(bfmNumber.toString());
+
+      // Check if the bfmSheet exists before clearing the specified ranges
+      if (bfmSheet) {
+        bfmSheet.getRange('A7:N1000').clearContent();
+        bfmSheet.getRange('P7:P1000').clearContent();
+        bfmSheet.getRange('U7:AG1000').clearContent();
+        bfmSheet.getRange('AI7:AI1000').clearContent();
+      }
+
+      // Exit the loop since the work order has been found
+      break;
+    }
+  }
+}
+
+
+
+
+}
+
+
+function sendChatMessage(workOrder, customer, description, materialHandlerName, materialHandlerEmail, WEBHOOK_URL) {
+  const data = {
+    "text": `*Update:* Work Order ${workOrder} (${customer} ${description}) has been printed and is ready for kitting. @${materialHandlerEmail}`
+  };
+  
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(data)
+  };
+
+  const response = UrlFetchApp.fetch(WEBHOOK_URL, options);
+  const jsonResponse = JSON.parse(response.getContentText());
+  return jsonResponse.thread.name;
+}
+
+function getWebhookUrl(sheetName) {
+  if (sheetName === 'Catheters') {
+    return 'https://chat.googleapis.com/v1/spaces/AAAAvesvUGw/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=mRDi4JKlzRgfZDkrwrScKhDiy1LcDyfCdkYegGErpZs%3D';
+  } else if (sheetName === 'Balloons') {
+    return 'https://chat.googleapis.com/v1/spaces/AAAAhZJApxI/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=GBiWTg58f7cbS3EGvI9dZVqG2nsNgd7kKF0nkgKDbY8%3D';
+  } else {
+    // Return a default webhook URL or throw an error if none of the conditions match
+    return null; // No webhook URL for other sheets
+  }
+}
+
+function sendReply(options) {
+  const { threadId, replyText, technicianEmail, engineerEmail, sheetId, sheetName, row, WEBHOOK_URL } = options;
+
+  const triggerLink = `https://script.google.com/macros/s/1_q4LwpjZHQLoNVC3KvJdp5jklNfxL_vgx2mDyzJXBWuvhwabQsBL1Y7g/exec?sheetId=${sheetId}&sheetName=${sheetName}&row=${row}&column=25`;
+  const data = {
+    "text": `${replyText}`,
+    "thread": {
+      "name": threadId
+    }
+  };
+
+  const requestOptions = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(data)
+  };
+
+  UrlFetchApp.fetch(WEBHOOK_URL, requestOptions);
+}
+
+function onEdit(e) {
+  const sheet = e.range.getSheet();
+  const sheetName = e.range.getSheet().getName();
+  const checkbox = sheet.getRange("toggleBox");
+
+  var row = e.range.getRow();
+  var column = e.range.getColumn();
+  var numRows = sheet.getLastRow();
+  var sectionStart = 8; // the first row of the section
+  var sectionEnd = 77; // the last row of the section
+
+  // If the edited cell is in the desired section
+  if (row >= sectionStart && row <= sectionEnd) {
+    // If the edited cell is not empty, unhide the next row (if hidden)
+    if (e.value) {
+      if (row < sectionEnd) {
+        var nextRow = sheet.getRange(row + 1, 1);
+        if (nextRow.getHeight() === 0) { // Check if the row is hidden
+          sheet.showRows(row + 1);
+        }
+      }
+    }
+  }
+
+  if (e.range.getA1Notation() === "C1") {
+    if (checkbox.isChecked()) {
+      sheet.getRange("C1").setBackground("#00FF00"); // green
+      ScriptApp.getProjectTriggers().forEach(function(trigger) {
+        if (trigger.getHandlerFunction() === "onEditInstallable") {
+          trigger.setEnabled(true);
+        }
+      });
+    } else {
+      sheet.getRange("C1").setBackground("#FF0000"); // red
+      ScriptApp.getProjectTriggers().forEach(function(trigger) {
+        if (trigger.getHandlerFunction() === "onEditInstallable") {
+          trigger.setEnabled(false);
+        }
+      });
+    }
+  }
+}
+
+
+function onOpen() {
+  var sheetNames = ['Balloons', 'Catheters'];
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  
+  sheetNames.forEach(function(sheetName) {
+    var sheet = spreadsheet.getSheetByName(sheetName);
+    var checkboxCell = sheet.getRange('C1');
+    checkboxCell.setValue(true);
+  });
+}
+
+
+function createNewSheet() {
+  console.time("Total Execution Time");
+  // Get the current sheet
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = ss.getName();
+  var file = DriveApp.getFileById(ss.getId());
+  var parentFolder = file.getParents().next();
+
+  // Extract month number, month name, and year from the sheet title
+  var regex = /^(\d{1,2})\s(\w+)\s(\d{4})\sPD\sSchedule$/;
+  var result = sheetName.match(regex);
+
+  if (!result) {
+    SpreadsheetApp.getUi().alert('Invalid sheet name format.');
+    return;
+  }
+
+  var monthNum = parseInt(result[1], 10);
+  var monthName = result[2];
+  var year = parseInt(result[3], 10);
+
+  // Calculate the next month and year
+  monthNum++;
+  if (monthNum > 12) {
+    monthNum = 1;
+    year++;
+  }
+  monthName = Utilities.formatDate(new Date(year, monthNum - 1), "GMT", "MMMM");
+
+  // Create the new sheet name
+  var newSheetName = monthNum + " " + monthName + " " + year + " PD Schedule";
+
+  // Make a copy of the current sheet
+  var newSheetFile = DriveApp.getFileById(ss.copy(newSheetName).getId());
+  // Move the new sheet to the same folder as the original sheet
+  parentFolder.addFile(newSheetFile);
+  DriveApp.getRootFolder().removeFile(newSheetFile);
+
+  // Get the new sheet URL
+  var url = newSheetFile.getUrl();
+
+  // Access the new sheet as a Spreadsheet object
+  var newSheet = SpreadsheetApp.openById(newSheetFile.getId());
+
+  // Uncheck the checkbox in the new sheet's Balloons and Catheters tabs
+var sheetNames = ['Balloons', 'Catheters'];
+
+sheetNames.forEach(function(sheetName) {
+  var newSheetTab = newSheet.getSheetByName(sheetName);
+  if (newSheetTab) {
+    newSheetTab.getRange('C1').setValue(false);
+  } else {
+    SpreadsheetApp.getUi().alert(sheetName + ' tab not found in the new sheet.');
+  }
+});
+
+
+
+  // Access the new sheet as a Spreadsheet object
+  var newSheet = SpreadsheetApp.openById(newSheetFile.getId());
+
+  // Call the functions to copy data and clear completed jobs
+console.time("copyDataToNewSheet - Balloons");
+copyDataToNewSheet(newSheet, 'Balloons');
+console.timeEnd("copyDataToNewSheet - Balloons");
+
+console.time("copyDataToNewSheet - Catheters");
+copyDataToNewSheet(newSheet, 'Catheters');
+console.timeEnd("copyDataToNewSheet - Catheters");
+
+
+  var tabs = ['Balloons', 'Catheters', 'Sheaths/Sleeves'];
+
+  for (var i = 0; i < tabs.length; i++) {
+    var tab = tabs[i];
+
+    console.time(tab + " - clearCompletedJobs");
+    clearCompletedJobs(newSheet, tab);
+    console.timeEnd(tab + " - clearCompletedJobs");
+
+    console.time(tab + " - reformatSections");
+    reformatSections(newSheet, tab);
+    console.timeEnd(tab + " - reformatSections");
+  }
+  // Call the new function to prompt user for sending email and opening the new sheet
+  promptToSendEmailAndOpenNewSheet(newSheetFile.getId());
+}
+
+function copyDataToNewSheet(newSheet, sheetName) {
+  var originalSheet = SpreadsheetApp.getActiveSpreadsheet();
+  var originalTab = originalSheet.getSheetByName(sheetName);
+  var newSheetData = newSheet.getSheetByName("Data");
+
+  // Get data from the original sheet in bulk
+  var customerNames = originalTab.getRange("BI8:BI30").getValues();
+  var runRates = originalTab.getRange("BJ8:BJ30").getValues();
+
+  // Set the target range based on the sheetName
+  var targetRange;
+  if (sheetName === 'Balloons') {
+    targetRange = "J2:J18";
+  } else if (sheetName === 'Catheters') {
+    targetRange = "J20:J30";
+  } else {
+    throw new Error('Invalid sheetName provided');
+  }
+
+  // Get data from the new sheet in bulk
+  var targetCustomerNames = newSheetData.getRange(targetRange).getValues();
+
+  for (var i = 0; i < customerNames.length; i++) {
+    var customerName = customerNames[i][0];
+    var runRate = runRates[i][0];
+
+    if (customerName) {
+      for (var j = 0; j < targetCustomerNames.length; j++) {
+        if (customerName === targetCustomerNames[j][0]) {
+          if (runRate) {
+            newSheetData.getRange("K" + (j + (sheetName === 'Balloons' ? 2 : 20))).setValue(runRate);
+          }
+          break;
+        }
+      }
+    }
+  }
+}
+
+function clearCompletedJobs(newSheet, sheetName) {
+  var sheet = newSheet.getSheetByName(sheetName);
+  var range = sheet.getRange(6, 1, sheet.getLastRow() - 5, sheet.getLastColumn());
+  var data = range.getValues();
+
+  var completedRows = [];
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][27] === data[i][6]) { // Compare column AB (index 27) with column G (index 6)
+      completedRows.push(i + 6);
+    }
+  }
+
+  var rangeListString = "";
+  for (var i = 0; i < completedRows.length; i++) {
+    rangeListString += "A" + completedRows[i] + ":C" + completedRows[i] + "," +
+      "D" + completedRows[i] + ":I" + completedRows[i] + "," +
+      "K" + completedRows[i] + ":N" + completedRows[i] + "," +
+      "P" + completedRows[i] + "," +
+      "U" + completedRows[i] + ":V" + completedRows[i] + "," +
+      "Y" + completedRows[i] + ":AC" + completedRows[i] + "," +
+      "AE" + completedRows[i] + "," +
+      "AI" + completedRows[i] + ":AJ" + completedRows[i] + (i < completedRows.length - 1 ? "," : "");
+  }
+  
+  // Split the rangeListString into an array of strings
+  var rangeListArray = rangeListString.split(',');
+
+  if (rangeListArray.length > 0) {
+    var rangeList = sheet.getRangeList(rangeListArray);
+    rangeList.clearContent();
+  }
+}
+
+function reformatSections(newSheet, sheetName) {
+  var sheet = newSheet.getSheetByName(sheetName);
+  var columnsToMove = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P", "U", "V", "Y", "Z", "AA", "AB", "AC", "AE", "AI", "AJ"];
+  var numRows = sheet.getLastRow();
+  var dataRange = sheet.getRange(8, 1, numRows - 7, sheet.getLastColumn());
+  var data = dataRange.getValues();
+
+  for (var rowIndex = 0; rowIndex < data.length;) {
+    // Find section header
+    if (data[rowIndex][2] === "Job Number") {
+      var startOfSection = rowIndex;
+      var endOfSection = data.length;
+
+      // Find end of the section
+      for (var searchIndex = startOfSection + 1; searchIndex < data.length; searchIndex++) {
+        if (data[searchIndex][2] === "Job Number") {
+          endOfSection = searchIndex;
+          break;
+        }
+      }
+
+      // Iterate through rows within the section
+      for (var rowInSection = startOfSection + 1; rowInSection < endOfSection; rowInSection++) {
+        if (!isEmptyRow(data[rowInSection], columnsToMove)) {
+          var emptyRowIndex = -1;
+
+          // Find the highest empty row within the section
+          for (var searchEmpty = startOfSection + 1; searchEmpty < rowInSection; searchEmpty++) {
+            if (isEmptyRow(data[searchEmpty], columnsToMove)) {
+              emptyRowIndex = searchEmpty;
+              break;
+            }
+          }
+
+          if (emptyRowIndex >= 0) {
+            // Move the data to the empty row
+            moveDataBetweenRows(sheet, rowInSection + 8, emptyRowIndex + 8, columnsToMove); // Updated from dataSheet to sheet
+            // Update the data array
+            data[emptyRowIndex] = data[rowInSection].slice(0);
+            data[rowInSection] = new Array(data[rowInSection].length).fill("");
+          }
+        }
+      }
+      // Move to the next section
+      rowIndex = endOfSection;
+    } else {
+      rowIndex++;
+    }
+  }
+}
+
+function isEmptyRow(rowData, columnsToCheck) {
+  return columnsToCheck.every(function(column) {
+    var columnIndex = columnNameToIndex(column);
+    return !rowData[columnIndex];
+  });
+}
+
+function columnNameToIndex(columnName) {
+  var columnIndex = 0;
+  var columnNameLength = columnName.length;
+
+  for (var i = 0; i < columnNameLength; i++) {
+    columnIndex *= 26;
+    columnIndex += columnName.charCodeAt(i) - 'A'.charCodeAt(0) + 1;
+  }
+
+  return columnIndex - 1;
+}
+
+function moveDataBetweenRows(sheet, sourceRow, targetRow, columns) {
+  for (var i = 0; i < columns.length; i++) {
+    var sourceCell = sheet.getRange(sourceRow, columnNameToIndex(columns[i]) + 1);
+    var targetCell = sheet.getRange(targetRow, columnNameToIndex(columns[i]) + 1);
+    targetCell.setValue(sourceCell.getValue());
+
+    // Clear the source cell content
+    sourceCell.clearContent();
+  }
+}
+
+function moveDataWithinSection(emptyRows, dataSheet, sectionStart, sectionEnd) {
+  var columnsToMove = [
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P",
+    "U", "V", "Y", "Z", "AA", "AB", "AC", "AE", "AI", "AJ"
+  ];
+
+  for (var i = sectionStart + 1; i < sectionEnd; i++) {
+    if (emptyRows.length === 0) {
+      break;
+    }
+        var firstEmptyRow = emptyRows.shift();
+    if (i > firstEmptyRow) {
+      for (var j = 0; j < columnsToMove.length; j++) {
+        var sourceRange = dataSheet.getRange(columnsToMove[j] + (i + 8));
+        var targetRange = dataSheet.getRange(columnsToMove[j] + (firstEmptyRow + 8));
+
+        // If sourceRange has data validation, copy the validation rules to targetRange
+        if (["B", "H", "P"].includes(columnsToMove[j])) {
+          var validationRule = sourceRange.getDataValidation();
+          if (validationRule) {
+            targetRange.setDataValidation(validationRule);
+          }
+        }
+
+        // Move the data
+        targetRange.setValue(sourceRange.getValue());
+        sourceRange.clearContent();
+      }
+    }
+  }
+}
+
+
+function promptToSendEmailAndOpenNewSheet(newSheetId) {
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert('Send email to the PD team with the new spreadsheet link?', ui.ButtonSet.YES_NO);
+
+  if (response === ui.Button.YES) {
+    sendEmail(newSheetId);
+    var secondResponse = ui.alert('Email has been sent. Would you like to open the new sheet?', ui.ButtonSet.YES_NO);
+
+    if (secondResponse === ui.Button.YES) {
+      openNewSheet(newSheetId);
+    }
+  } else {
+    var secondResponse = ui.alert('Email has NOT been sent. You will need to manually email the team later. Would you like to open the new sheet?', ui.ButtonSet.YES_NO);
+
+    if (secondResponse === ui.Button.YES) {
+      openNewSheet(newSheetId);
+    }
+  }
+}
+
+function openNewSheet(newSheetId) {
+  var newSheetUrl = SpreadsheetApp.openById(newSheetId).getUrl();
+  var htmlOutput = HtmlService.createHtmlOutput('<html><script>window.open("' + newSheetUrl + '", "_blank"); window.close();</script></html>')
+    .setWidth(10)
+    .setHeight(10);
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Opening new sheet...');
+}
+
+function sendEmail(newSheetId) {
+  var newSheet = SpreadsheetApp.openById(newSheetId);
+  var newSheetId = PropertiesService.getScriptProperties().getProperty('newSheetId');
+  // Get the recipient email addresses from the Data tab, N3:N50
+  var dataSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Data');
+  var emailRange = dataSheet.getRange("N3:N50");
+  var recipientEmails = emailRange.getValues().flat().filter(function(email) { return email !== ''; }).join(', ');
+
+  // Get the month from the new sheet's title
+  var newSheetName = newSheet.getName();
+  var month = newSheetName.split(" ")[1]; // Assuming the format is "1 January 2023 PD Schedule"
+
+  // Set up the subject and body
+  var subject = "New PD Schedule - " + month;
+  var newSheetUrl = newSheet.getUrl();
+  var body = "Hello, Team!\n\n" +
+             "A new PD schedule has been created for the month of " + month + ". You can find the link below:\n\n" +
+             newSheetUrl + "\n\n" +
+             "Reminder to check the schedule and ensure accuracy of details and completion of required documents. Thank you!";
+
+  // Send the email
+  GmailApp.sendEmail(recipientEmails, subject, body);
+}
+
+
+
