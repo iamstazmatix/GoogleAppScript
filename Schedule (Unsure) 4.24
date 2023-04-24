@@ -3,16 +3,10 @@ function onEditInstallable(e) {
   const sheet = sheetNames.includes(e.range.getSheet().getName()) ? e.range.getSheet() : null;
 
   if (!sheet) {
-    console.log('Sheet not in the list of sheet names.');
     return;
   }
 
-  // Store the formula of the edited cell (if any)
-  storeFormula(e.range);
-
   let WEBHOOK_URL = getWebhookUrl(e.range.getSheet().getName());
-  
-  const watchColumnC = 3; // Column C
   const watchColumn1 = 9; // Column I (A=1, B=2, C=3, ..., I=9)
   const watchColumn2 = 13; // Column M (A=1, B=2, C=3, ..., M=13)
   const watchColumnU = 21; // Column U
@@ -20,44 +14,13 @@ function onEditInstallable(e) {
   const watchColumnZ = 26; // Column Z (A=1, B=2, C=3, ..., Z=26)
   const watchColumnAA = 27; // Column AA
   const watchColumnAB = 28; // Column AB
-  const watchColumnAI = 35; // Column AI
   const watchColumnV = 22; // Column V (A=1, B=2, C=3, ..., V=22)
   const anotherSheetUrl = 'https://docs.google.com/spreadsheets/d/1pdB6GM5WkYhlfcuq2_RzM5qh6WwLj0w--zK4kadHPQo/edit#gid=1522203497';
-  const materialHandlerUserId = findUserIdByName(materialHandlerName, dataSheet);
-  const editedCellNotation = e.range.getA1Notation();
-  const key = e.range.getSheet().getName() + '!' + editedCellNotation;
-  const storedFormula = PropertiesService.getScriptProperties().getProperty(key);
+
   const checkbox = sheet.getRange("toggleBox");
 
 if (!checkbox.isChecked()) {
   return;
-}
-
-if (sheetNames.includes(e.range.getSheet().getName()) && storedFormula) {
-    console.log('Cell with formula edited');
-    const row = e.range.getRow();
-    const col = e.range.getColumn();
-    const targetCell = sheet.getRange(row, col);
-
-    // Restore the original formula
-    targetCell.setFormula(storedFormula);
-
-    // Show a prompt to the user
-    const ui = SpreadsheetApp.getUi();
-    const result = ui.alert(
-      'This cell contained a formula and should not be edited. The formula has been restored.'
-    );
-  } else {
-    console.log('No stored formula or not in the list of sheet names.');
-  }
-
-if (e.range.getColumn() === watchColumnC && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
-  console.log('Column C edited and was previously empty');
-  const row = e.range.getRow();
-  const targetCell = sheet.getRange(row, watchColumn1);
-  
-  // Insert an unchecked checkmark (false)
-  targetCell.insertCheckboxes().uncheck();
 }
 
  if (e.range.getColumn() === watchColumn1 && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
@@ -65,7 +28,7 @@ if (e.range.getColumn() === watchColumnC && sheetNames.includes(e.range.getSheet
   const row = e.range.getRow();
   const workOrder = sheet.getRange(row, 3).getValue(); // Column C
   const customer = sheet.getRange(row, 2).getValue();
-  const description = sheet.getRange(row, 6).getValue(); // Column F
+    const description = sheet.getRange(row, 6).getValue(); // Column F
 
   const dataSheet = e.source.getSheetByName('Data');
   const materialHandlerName = dataSheet.getRange('C4').getValue();
@@ -77,7 +40,7 @@ if (e.range.getColumn() === watchColumnC && sheetNames.includes(e.range.getSheet
   sheet.getRange(row, watchColumn1).setValue(new Date());
 }
 
- if (e.range.getColumn() === watchColumn2 && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
+  if (e.range.getColumn() === watchColumn2 && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
   const row = e.range.getRow();
   const threadId = sheet.getRange(row, 1).getValue();
   const workOrder = sheet.getRange(row, 3).getValue(); // Column C
@@ -117,8 +80,7 @@ if (e.range.getColumn() === watchColumnC && sheetNames.includes(e.range.getSheet
                       "text": "Click Here",
                       "onClick": {
                         "openLink": {
-                          "url": `https://script.google.com/a/macros/confluentmedical.com/s/AKfycbzQ4g2UY2PglySs8wtyDNwpV7gElQ_io4rkW6HZ_kvEfK_BSL9KEATg2ji9bHiKhVRAlA/exec
-?action=startSetup&row=${row}&threadId=${threadId}&workOrder=${workOrder}&customer=${encodeURIComponent(customer)}&description=${encodeURIComponent(description)}`
+                          "url": `https://script.google.com/a/macros/confluentmedical.com/s/AKfycbzQ4g2UY2PglySs8wtyDNwpV7gElQ_io4rkW6HZ_kvEfK_BSL9KEATg2ji9bHiKhVRAlA/exec?action=startSetup&row=${row}&threadId=${threadId}&workOrder=${workOrder}&customer=${encodeURIComponent(customer)}&description=${encodeURIComponent(description)}`
                         }
                       }
                     }
@@ -252,7 +214,7 @@ if (e.range.getColumn() === watchColumnAB && sheetNames.includes(e.range.getShee
 
   const [engFirstName, engLastName] = engineerName.split(' ');
   const engineerEmail = `${engFirstName}.${engLastName}@confluentmedical.com`;
-    
+
     // Set the value of Column AI to the current date
     sheet.getRange(row, 35).setValue(currentDate);
 
@@ -266,7 +228,7 @@ if (e.range.getColumn() === watchColumnAB && sheetNames.includes(e.range.getShee
       row: row,
       WEBHOOK_URL: WEBHOOK_URL
     });
-  
+
   const data = {
   "thread": {
     "name": threadId
@@ -385,57 +347,57 @@ if (e.range.getColumn() === watchColumnU && sheetNames.includes(e.range.getSheet
           "widgets": [
             {
               "textParagraph": {
-                "text": "<u>1. Review LHR</u>\n   a. Verify all fields are filled out with the proper revision\n   b. Ensure any empty fields are appropriately marked with N/A\n   c. Verify proper Good Documentation Practices.\n   d. Sign and Date if necessary"
+                "text": "<u>1. Review LHR</u>\n   a. Verify all fields are filled out with the proper revision\n   b. Ensure any empty fields are appropriately marked with N/A\n   c. Verify proper Good Documentation Practices.\n   d. Sign and Date if necessary"
                 }
             },
             {
               "textParagraph": {
-                "text": "<u>2. Review Balloon Anneal Log (FM-147)</u>\n   a. Confirm Header Information Matches Work Order.\n        • Lot Number\n        • Balloon Part Number\n        • Revision\n        • Job Quantity\n        • Balloon Size\n        • BFM#\n   b. Review Each Line to Verify Information Recorded Accurately:\n        • Oven Asset - Confirm # was recorded & calibrated.\n        • Date\n        • Timer Asset - Confirm # was recorded & calibrated.\n        • Time In - Must have AM/PM\n        • Duration Time - Verify Duration Time with Balloon Drawing\n        • Time Out - Must be Time In + Duration Time and have AM/PM\n        • QTY\n        • Oven Temp - Verify Oven Temp with Balloon Drawing\n        • Initials - Verify Line Clearance (FM-055) matches operators on date."
+                "text": "<u>2. Review Balloon Anneal Log (FM-147)</u>\n   a. Confirm Header Information Matches Work Order.\n        • Lot Number\n        • Balloon Part Number\n        • Revision\n        • Job Quantity\n        • Balloon Size\n        • BFM#\n   b. Review Each Line to Verify Information Recorded Accurately:\n        • Oven Asset - Confirm # was recorded & calibrated.\n        • Date\n        • Timer Asset - Confirm # was recorded & calibrated.\n        • Time In - Must have AM/PM\n        • Duration Time - Verify Duration Time with Balloon Drawing\n        • Time Out - Must be Time In + Duration Time and have AM/PM\n        • QTY\n        • Oven Temp - Verify Oven Temp with Balloon Drawing\n        • Initials - Verify Line Clearance (FM-055) matches operators on date."
                 }
             },
             {
               "textParagraph": {
-                "text": "<u>3. Review Inspection Sheet (FM-022)</u>\n   a. Confirm Header Information Matches Work Order.\n        • Lot Number\n        • Balloon Part Number\n        • Revision\n        • Job Quantity\n        • Customer\n        • Balloon Size\n        • BFM#\n        • Cell # (Should be N/A)\n        • Interval QTY (Should Match Machine Tag, verify with IP-180)\n   b. Review Each Line of the Inspection Sheet\n        • Confirm the Math in Each Column is Accurate\n          - Total Fail (Sum of Row Rejects - MB)\n          - Run Total Fail (Current Row Total Fail + Prev. Row Run Total Fail)\n          - Total Pass (Row Total Blown - Row Total Fail)\n          - Run Total Pass (Current Row Total Pass + Prev. Row Run Total Pass)\n       • Operator & Inspector Initials\n          - Confirm Line Clearance (FM-055) completed date entry was made.\n  c. Verify Inspection Totals match Anneal Record totals"
+                "text": "<u>3. Review Inspection Sheet (FM-022)</u>\n   a. Confirm Header Information Matches Work Order.\n        • Lot Number\n        • Balloon Part Number\n        • Revision\n        • Job Quantity\n        • Customer\n        • Balloon Size\n        • BFM#\n        • Cell # (Should be N/A)\n        • Interval QTY (Should Match Machine Tag, verify with IP-180)\n   b. Review Each Line of the Inspection Sheet\n        • Confirm the Math in Each Column is Accurate\n          - Total Fail (Sum of Row Rejects - MB)\n          - Run Total Fail (Current Row Total Fail + Prev. Row Run Total Fail)\n          - Total Pass (Row Total Blown - Row Total Fail)\n          - Run Total Pass (Current Row Total Pass + Prev. Row Run Total Pass)\n       • Operator & Inspector Initials\n          - Confirm Line Clearance (FM-055) completed date entry was made.\n  c. Verify Inspection Totals match Anneal Record totals"
               }
             },
             {
               "textParagraph": {
-                "text": "<u>4. Review Balloon In-Process Data Sheet FM-024</u>\n   a. Verify asset numbers and calibration status in “Test Equipment Record” fields.\n   b. Verify operator initials and date for every operator performing testing. (Can verify this when verifying Final Inspection Report print outs.)"
+                "text": "<u>4. Review Balloon In-Process Data Sheet FM-024</u>\n   a. Verify asset numbers and calibration status in “Test Equipment Record” fields.\n   b. Verify operator initials and date for every operator performing testing. (Can verify this when verifying Final Inspection Report print outs.)"
               }
             },
             {
               "textParagraph": {
-                "text": "<u>5. Verify that PQ Report is present and has all signatures.</u>\n  a. Any writing follows Good Documentation Practices."
+                "text": "<u>5. Verify that PQ Report is present and has all signatures.</u>\n  a. Any writing follows Good Documentation Practices."
               }
             },
             {
               "textParagraph": {
-                "text": "<u>6. Verify that final inspection report is present and has all signatures</u>\n  a. Any writing follows Good Documentation Practices."
+                "text": "<u>6. Verify that final inspection report is present and has all signatures</u>\n  a. Any writing follows Good Documentation Practices."
               }
             },
             {
               "textParagraph": {
-                "text": "<u>6. Verify that final inspection report is present and has all signatures</u>\n   a. Verify that any operator signing a printout has also signed FM-024.\n  b. Any writing follows Good Documentation Practices."
+                "text": "<u>6. Verify that final inspection report is present and has all signatures</u>\n   a. Verify that any operator signing a printout has also signed FM-024.\n  b. Any writing follows Good Documentation Practices."
               }
             },
             {
               "textParagraph": {
-                "text": "<u>7. Verify Pick List</u>\n  a. Follows Good Documentation Practices."
+                "text": "<u>7. Verify Pick List</u>\n  a. Follows Good Documentation Practices."
               }
             },
             {
               "textParagraph": {
-                "text": "<u>8. Verify Work Order is present (OC Traveler report style)</u>\n  a. Any writing follows Good Documentation Practices."
+                "text": "<u>8. Verify Work Order is present (OC Traveler report style)</u>\n  a. Any writing follows Good Documentation Practices."
               }
             },
             {
               "textParagraph": {
-                "text": "<u>9. Verify Balloon Labels are correct and have necessary information.</u>\n  a. Lot Number.\n  b. Part Number.\n  c. Revision.\n  d. Customer Part Number.\n  e. Customer Revision\n  f. PO Number (Formatted PO#####)\n  g. SO Number.\n  h. Bag QTY\n        • Confirm bag was verified on FM-183. "
+                "text": "<u>9. Verify Balloon Labels are correct and have necessary information.</u>\n  a. Lot Number.\n  b. Part Number.\n  c. Revision.\n  d. Customer Part Number.\n  e. Customer Revision\n  f. PO Number (Formatted PO#####)\n  g. SO Number.\n  h. Bag QTY\n        • Confirm bag was verified on FM-183. "
               }
             },
             {
               "textParagraph": {
-                "text": "<u>10. Verify presence of correct sales order (if necessary)</u>\n  a. Sales Order matches SO listed on Traveler and Labels."
+                "text": "<u>10. Verify presence of correct sales order (if necessary)</u>\n  a. Sales Order matches SO listed on Traveler and Labels."
               }
             },
           ]
@@ -462,18 +424,6 @@ if (e.range.getColumn() === watchColumnU && sheetNames.includes(e.range.getSheet
   };
 
   UrlFetchApp.fetch(WEBHOOK_URL, options);
-}
-
-if (e.range.getColumn() === watchColumnAI && sheetNames.includes(e.range.getSheet().getName())) {
-  console.log('Column AI edited');
-  const row = e.range.getRow();
-  const targetCell = sheet.getRange(row, watchColumnAI);
-
-  // Clear the user input
-  targetCell.clearContent();
-
-  // Insert a timestamp with the current date and time
-  targetCell.setValue(new Date());
 }
 
 if (e.range.getColumn() === watchColumnV && sheetNames.includes(e.range.getSheet().getName()) && !e.oldValue) {
@@ -535,41 +485,27 @@ if (e.range.getColumn() === watchColumnV && sheetNames.includes(e.range.getSheet
       // Exit the loop since the work order has been found
       break;
     }
-
-    if (sheetNames.includes(e.range.getSheet().getName()) && storedFormula) {
-    console.log('Cell with formula edited');
-    const row = e.range.getRow();
-    const col = e.range.getColumn();
-    const targetCell = sheet.getRange(row, col);
-
-    // Restore the original formula
-    targetCell.setFormula(storedFormula);
-
-    // Show a prompt to the user
-    const ui = SpreadsheetApp.getUi();
-    const result = ui.alert(
-      'This cell contained a formula and should not be edited. The formula has been restored.'
-    );
-  }
-
   }
 }
+
+
+
+
 }
 
-//End of Portion 1
 
 function findUserIdByName(name, dataSheet) {
   const nameColumn = 13; // Column M
   const userIdColumn = 15; // Column O
   const numRows = dataSheet.getLastRow() - 1;
-  
+
   const names = dataSheet.getRange(2, nameColumn, numRows).getValues();
   for (let i = 0; i < names.length; i++) {
     if (names[i][0] === name) {
       return dataSheet.getRange(i + 2, userIdColumn).getValue();
     }
   }
-  
+
   return null;
 }
 
@@ -577,7 +513,7 @@ function sendChatMessage(workOrder, customer, description, materialHandlerName, 
   const data = {
     "text": `*Update:* Work Order ${workOrder} (${customer} ${description}) has been printed and is ready for kitting. <users/${materialHandlerUserId}>`
   };
-  
+
   const options = {
     method: 'post',
     contentType: 'application/json',
@@ -588,17 +524,6 @@ function sendChatMessage(workOrder, customer, description, materialHandlerName, 
   const jsonResponse = JSON.parse(response.getContentText());
   return jsonResponse.thread.name;
 }
-
-function storeFormula(range) {
-  const formula = range.getFormula();
-  if (formula) {
-    const sheetName = range.getSheet().getName();
-    const cellNotation = range.getA1Notation();
-    const key = sheetName + '!' + cellNotation;
-    PropertiesService.getScriptProperties().setProperty(key, formula);
-  }
-}
-
 
 
 function getWebhookUrl(sheetName) {
@@ -679,7 +604,7 @@ function onEdit(e) {
 function onOpen() {
   var sheetNames = ['Balloons', 'Catheters'];
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  
+
   sheetNames.forEach(function(sheetName) {
     var sheet = spreadsheet.getSheetByName(sheetName);
     var checkboxCell = sheet.getRange('C1');
@@ -838,7 +763,7 @@ function clearCompletedJobs(newSheet, sheetName) {
       "AE" + completedRows[i] + "," +
       "AI" + completedRows[i] + ":AJ" + completedRows[i] + (i < completedRows.length - 1 ? "," : "");
   }
-  
+
   // Split the rangeListString into an array of strings
   var rangeListArray = rangeListString.split(',');
 
@@ -1013,6 +938,3 @@ function sendEmail(newSheetId) {
   // Send the email
   GmailApp.sendEmail(recipientEmails, subject, body);
 }
-
-
-
