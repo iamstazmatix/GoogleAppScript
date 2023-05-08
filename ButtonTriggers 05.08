@@ -1,0 +1,427 @@
+function doGet(e) {
+  // Log the incoming request and its parameters
+  Logger.log("Incoming request:", JSON.stringify(e));
+  Logger.log("Request queryString:", e.queryString);
+  Logger.log("Request parameters:", e.parameter);
+  Logger.log("Test parameter:", e.parameter.testParam);
+  
+  // Parse the action from the request parameters
+  const action = e.parameter.action;
+  const workOrderNumber = e.parameter.workOrderNumber;
+  const threadId = e.parameter.threadId;
+
+  // Log the parsed action and work order number
+  Logger.log("Action:", action);
+  Logger.log("WorkOrderNumber:", workOrderNumber);
+  Logger.log("ThreadId:", threadId);
+
+  // Call the appropriate function based on the action
+  if (action === "triggerEngineerTechnicianReview") {
+  triggerEngineerTechnicianReview(workOrderNumber);
+  return ContentService.createTextOutput('triggerEngineerTechnicianReview executed');
+  } else if (action === "triggerLeadReview") {
+    triggerLeadReview({ workOrderNumber, threadId });
+  } else if (action === "triggerDeliveredtoQC") {
+    triggerDeliveredtoQC(workOrderNumber);
+  } else {
+    // Log an error if the action is not recognized
+    Logger.log("Error: Unrecognized action:", action);
+  }
+
+  return HtmlService.createHtmlOutput('<h1>Hello, World!</h1>');
+}
+
+function triggerEngineerTechnicianReview(workOrderNumber) {
+  Logger.log("Starting triggerEngineerTechnicianReview function"); // Add this log
+  Logger.log("WorkOrderNumber:", workOrderNumber); // Add this log
+  // Access the external sheet and the Balloons and Data tabs
+  const balloonsSheet = SpreadsheetApp.openByUrl(balloonsSheetUrl);
+  const balloonsTab = balloonsSheet.getSheetByName('Balloons');
+  const balloonsNumRows = balloonsTab.getLastRow();
+  const dataSheet = balloonsSheet.getSheetByName('Data');
+  const dataNumRows = dataSheet.getLastRow();
+
+  // Loop through the rows in the Balloons tab
+  for (let row = 2; row <= balloonsNumRows; row++) {
+    const balloonsWorkOrderNumber = balloonsTab.getRange(row, 3).getValue();
+    Logger.log("BalloonsWorkOrderNumber (row " + row + "):", balloonsWorkOrderNumber); // Add this log
+
+
+    // Find the row with the matching work order number
+    if (workOrderNumber === balloonsWorkOrderNumber) {
+      Logger.log("Matching workOrderNumber found in Balloons tab"); // Add this log
+
+      // Get Engineer and Technician names
+      const engineerName = balloonsTab.getRange(row, 23).getValue();
+      const technicianName = balloonsTab.getRange(row, 24).getValue();
+
+      let engineerUserId, technicianUserId;
+
+      // Loop through the rows in the Data tab
+      for (let dataRow = 3; dataRow <= dataNumRows; dataRow++) {
+        const dataName = dataSheet.getRange(dataRow, 13).getValue();
+        const dataUserId = dataSheet.getRange(dataRow, 15).getValue();
+
+        // Find the matching user IDs for the Engineer and Technician
+        if (dataName === engineerName && !engineerUserId) {
+          engineerUserId = dataUserId;
+          Logger.log("EngineerUserId found:", engineerUserId); // Add this log
+        }
+
+        if (dataName === technicianName && !technicianUserId) {
+          technicianUserId = dataUserId;
+          Logger.log("TechnicianUserId found:", technicianUserId); // Add this log
+        }
+
+        if (engineerUserId && technicianUserId) {
+          break;
+        }
+      }
+
+      // Access the active sheet and the Overall tab
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const overallSheet = ss.getSheetByName('Overall');
+      const overallNumRows = overallSheet.getLastRow();
+
+      // Loop through the rows in the Overall tab
+      for (let overallRow = 2; overallRow <= overallNumRows; overallRow++) {
+        const overallWorkOrderNumber = overallSheet.getRange(overallRow, 2).getValue();
+
+        // Find the row with the matching work order number
+        if (workOrderNumber === overallWorkOrderNumber) {
+          Logger.log("Matching workOrderNumber found in Overall tab"); // Add this log
+          // Get the thread ID
+          const threadId = overallSheet.getRange(overallRow, 14).getValue();
+
+          // Prepare the reply text and card content
+          overallSheet.getRange(overallRow, 6).setValue("Closing (Eng/Tech Review)");
+          const workOrder = balloonsTab.getRange(row, 3).getValue();
+          const customer = balloonsTab.getRange(row, 2).getValue();
+          const description = balloonsTab.getRange(row, 6).getValue();
+          const replyText = `*Update:* Work Order ${workOrder} (${customer} ${description}) has completed Inspector Review. Ready for Engineer/Technician Review. <users/${engineerUserId}> <users/${technicianUserId}>`;
+
+          const card = {
+            title: "Technician/Engineer Tasks",
+            body: "1. Review and Sign Final Inspection Report. (Correct Errors and Reprint as Necessary).",
+            button: {
+              text: "Click Here When Completed",
+                            url: "https://script.google.com/a/macros/confluentmedical.com/s/AKfycbyX2oJTYxWcjnHjyALNddWLUYZSa5FrsVC9Fzt9fUKdIfuwpav304SNESOJUJHq9MWvqg/exec?action=triggerLeadReview&workOrderNumber=" + workOrderNumber + "&threadId=" + threadId + "&close=1",
+            }
+          };
+          // Log the button URL
+          Logger.log("Card object as a string:", JSON.stringify(card));
+          Logger.log("Button object:", JSON.stringify(card.button));
+          Logger.log("Button URL:", card.button.url);
+
+
+
+          // Send the reply
+          sendReply({
+            threadId,
+            replyText,
+            sheetId: balloonsSheet.getId(),
+            sheetName: balloonsTab.getName(),
+            row: row,
+            WEBHOOK_URL: WEBHOOK_URL,
+            card: card
+          });
+
+
+          Logger.log("Completed triggerEngineerTechnicianReview function"); // Add this log
+          break;
+        }
+      }
+    }
+  }
+}
+
+function triggerLeadReview(params) {
+  const workOrderNumber = params.workOrderNumber;
+  const threadId = params.threadId;
+  const balloonsSheet = SpreadsheetApp.openByUrl(balloonsSheetUrl);
+  const balloonsTab = balloonsSheet.getSheetByName('Balloons');
+  const balloonsNumRows = balloonsTab.getLastRow();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const overallSheet = ss.getSheetByName('Overall');
+  const overallNumRows = overallSheet.getLastRow();
+  const dataSheet = balloonsSheet.getSheetByName('Data');
+  const leadName = dataSheet.getRange(3, 3).getValue();
+
+    // Loop through the rows in the Balloons tab
+  for (let row = 2; row <= balloonsNumRows; row++) {
+    const balloonsWorkOrderNumber = balloonsTab.getRange(row, 3).getValue();
+
+    // Find the row with the matching work order number
+    if (workOrderNumber === balloonsWorkOrderNumber) {
+      Logger.log(`Match found in Balloons tab at row ${row}`);
+      balloonsTab.getRange(row, 21).setValue(new Date()); // Update the timestamp in the external sheet
+      break; // Break out of the loop (Balloons tab)
+    }
+  }
+  
+  let leadUserId;
+  for (let dataRow = 3; dataRow <= dataSheet.getLastRow(); dataRow++) {
+    const dataName = dataSheet.getRange(dataRow, 13).getValue();
+    const dataUserId = dataSheet.getRange(dataRow, 15).getValue();
+
+    if (dataName === leadName) {
+      leadUserId = dataUserId;
+      break;
+    }
+  }
+
+  for (let overallRow = 2; overallRow <= overallNumRows; overallRow++) {
+    const overallWorkOrderNumber = overallSheet.getRange(overallRow, 2).getValue();
+
+    if (workOrderNumber === overallWorkOrderNumber) {
+      overallSheet.getRange(overallRow, 6).setValue("Closing (Lead Review)");
+      const customer = overallSheet.getRange(overallRow, 3).getValue();
+      const description = overallSheet.getRange(overallRow, 4).getValue();
+
+      const replyText = `*Update:* Work Order ${workOrderNumber} (${customer} ${description}) is ready for final review. <users/${leadUserId}>`;
+
+          const card = {
+        "cards": [
+          {
+            "sections": [
+                  {
+                    "header": "<font color='black'><b>Lead (Supervisor) Tasks</b>",
+                    "widgets": [
+            {
+       "textParagraph": {
+    "text": "<u>1. Review LHR</u>\n   a. Verify all fields are filled out with the proper revision\n   b. Ensure any empty fields are appropriately marked with N/A\n   c. Verify proper Good Documentation Practices.\n   d. Sign and Date if necessary"
+       }
+      },
+
+      {
+  "textParagraph": {
+    "text": "<u>2. Review Balloon Anneal Log (FM-147)</u>\n   a. Confirm Header Information Matches Work Order.\n        • Lot Number\n        • Balloon Part Number\n        • Revision\n        • Job Quantity\n        • Balloon Size\n        • BFM#\n   b. Review Each Line to Verify Information Recorded Accurately:\n        • Oven Asset - Confirm # was recorded & calibrated.\n        • Date\n        • Timer Asset - Confirm # was recorded & calibrated.\n        • Time In - Must have AM/PM\n        • Duration Time - Verify Duration Time with Balloon Drawing\n        • Time Out - Must be Time In + Duration Time and have AM/PM\n        • QTY\n        • Oven Temp - Verify Oven Temp with Balloon Drawing\n        • Initials - Verify Line Clearance (FM-055) matches operators on date."
+        }
+      },
+            {
+              "textParagraph": {
+                "text": "<u>3. Review Inspection Sheet (FM-022)</u>\n   a. Confirm Header Information Matches Work Order.\n        • Lot Number\n        • Balloon Part Number\n        • Revision\n        • Job Quantity\n        • Customer\n        • Balloon Size\n        • BFM#\n        • Cell # (Should be N/A)\n        • Interval QTY (Should Match Machine Tag, verify with IP-180)\n   b. Review Each Line of the Inspection Sheet\n        • Confirm the Math in Each Column is Accurate\n          - Total Fail (Sum of Row Rejects - MB)\n          - Run Total Fail (Current Row Total Fail + Prev. Row Run Total Fail)\n          - Total Pass (Row Total Blown - Row Total Fail)\n          - Run Total Pass (Current Row Total Pass + Prev. Row Run Total Pass)\n       • Operator & Inspector Initials\n          - Confirm Line Clearance (FM-055) completed date entry was made.\n  c. Verify Inspection Totals match Anneal Record totals"
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>4. Review Balloon In-Process Data Sheet FM-024</u>\n   a. Verify asset numbers and calibration status in “Test Equipment Record” fields.\n   b. Verify operator initials and date for every operator performing testing. (Can verify this when verifying Final Inspection Report print outs.)"
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>5. Verify that PQ Report is present and has all signatures.</u>\n  a. Any writing follows Good Documentation Practices."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>6. Verify that final inspection report is present and has all signatures</u>\n  a. Any writing follows Good Documentation Practices."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>6. Verify that final inspection report is present and has all signatures</u>\n   a. Verify that any operator signing a printout has also signed FM-024.\n  b. Any writing follows Good Documentation Practices."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>7. Verify Pick List</u>\n  a. Follows Good Documentation Practices."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>8. Verify Work Order is present (OC Traveler report style)</u>\n  a. Any writing follows Good Documentation Practices."
+              }
+            },
+            {
+              "textParagraph": {
+                "text": "<u>9. Verify Balloon Labels are correct and have necessary information.</u>\n  a. Lot Number.\n  b. Part Number.\n  c. Revision.\n  d. Customer Part Number.\n  e. Customer Revision\n  f. PO Number (Formatted PO#####)\n  g. SO Number.\n  h. Bag QTY\n        • Confirm bag was verified on FM-183. "
+              }
+            },
+            {
+           "textParagraph": {
+             "text": "<u>10. Verify presence of correct sales order (if necessary)</u>\n  a. Sales Order matches SO listed on Traveler and Labels."
+           }
+          },
+          ]
+        },
+         {
+          "widgets": [
+            {
+              "buttons": [
+                {
+                  "textButton": {
+                    "text": "Click Here When Delivered to QC",
+                    "onClick": {
+                      "openLink": {
+                        "url": "https://script.google.com/a/macros/confluentmedical.com/s/AKfycbyX2oJTYxWcjnHjyALNddWLUYZSa5FrsVC9Fzt9fUKdIfuwpav304SNESOJUJHq9MWvqg/exec?action=triggerDeliveredtoQC&workOrderNumber=" + workOrderNumber + "&close=1"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+                    ]
+                  }
+                ]
+              }; 
+
+      sendReply2({
+        threadId,
+        replyText,
+        sheetId: ss.getId(),
+        sheetName: overallSheet.getName(),
+        row: overallRow,
+        WEBHOOK_URL: WEBHOOK_URL,
+        card: card
+      });
+
+      break;
+    }
+  }
+}
+
+function triggerDeliveredtoQC(workOrderNumber) {
+  // Access the external sheet and the Balloons and Data tabs
+  const balloonsSheet = SpreadsheetApp.openByUrl(balloonsSheetUrl);
+  const balloonsTab = balloonsSheet.getSheetByName('Balloons');
+  const balloonsNumRows = balloonsTab.getLastRow();
+  const dataSheet = balloonsSheet.getSheetByName('Data');
+  const dataNumRows = dataSheet.getLastRow();
+
+  // Loop through the rows in the Balloons tab
+  for (let row = 2; row <= balloonsNumRows; row++) {
+    const balloonsWorkOrderNumber = balloonsTab.getRange(row, 3).getValue();
+
+    // Find the row with the matching work order number
+    if (workOrderNumber === balloonsWorkOrderNumber) {
+      Logger.log(`Match found in Balloons tab at row ${row}`);
+      balloonsTab.getRange(row, 22).setValue(new Date()); // Update the timestamp in the external sheet
+      break; // Break out of the loop (Balloons tab)
+    }
+  }
+
+  // Access the active sheet and the Overall tab
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const overallSheet = ss.getSheetByName('Overall');
+  const overallNumRows = overallSheet.getLastRow();
+
+  // Loop through the rows in the Overall tab
+  for (let overallRow = 2; overallRow <= overallNumRows; overallRow++) {
+    const overallWorkOrderNumber = overallSheet.getRange(overallRow, 2).getValue();
+
+    // Find the row with the matching work order number
+    if (workOrderNumber === overallWorkOrderNumber) {
+      Logger.log(`Match found in Overall tab at row ${overallRow}`);
+      // Get the thread ID
+      const threadId = overallSheet.getRange(overallRow, 14).getValue();
+
+      // Prepare the reply text and card content
+      const workOrderNumber = overallSheet.getRange(overallRow, 2).getValue();
+      const customer = overallSheet.getRange(overallRow, 3).getValue();
+      const description = overallSheet.getRange(overallRow, 4).getValue();
+      const replyText = `*Update:* Work Order ${workOrderNumber} (${customer} ${description}) has been delivered to QC.`;
+  const gifUrl = getRandomGifUrl();
+
+  const card = {
+  cards: [{
+    sections: [{
+      widgets: [{
+        image: {
+          imageUrl: gifUrl
+        }
+      }]
+    }]
+  }]
+  };
+
+    console.log(JSON.stringify(card));
+
+  sendReply2({
+  threadId,
+  replyText,
+  WEBHOOK_URL: WEBHOOK_URL,
+  card: card
+  });
+
+      // Clear values in the Overall tab and set status to Open
+      overallSheet.getRange(overallRow, 2).clearContent(); // Column B
+      overallSheet.getRange(overallRow, 3).clearContent(); // Column C
+      overallSheet.getRange(overallRow, 4).clearContent(); // Column D
+      overallSheet.getRange(overallRow, 5).clearContent(); // Column E
+      overallSheet.getRange(overallRow, 13).clearContent(); // Column M
+      overallSheet.getRange(overallRow, 14).clearContent(); // Column N
+      overallSheet.getRange(overallRow, 6).setValue('Open');
+
+      // Clear values in BFM tab
+      const bfmNumber = overallSheet.getRange(overallRow, 1).getValue();
+      const bfmSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(bfmNumber);
+      if (bfmSheet) {
+        bfmSheet.getRange('A7:N1000').clearContent();
+        bfmSheet.getRange('P7:P1000').clearContent();
+        bfmSheet.getRange('U7:AG1000').clearContent();
+        bfmSheet.getRange('AI7:AI1000').clearContent();
+      } else {
+        throw new Error(`Sheet with name '${bfmNumber}' not found in the active spreadsheet.`);
+      }
+
+      break; // Break out of the loop (Overall tab)
+    }
+  }
+}
+
+function sendReply2(options) {
+  const { threadId, replyText, technicianEmail, engineerEmail, sheetId, sheetName, row, WEBHOOK_URL, card, buttonUrl } = options;
+  
+  const data = {
+    "text": replyText,
+    "thread": {
+      "name": threadId
+    }
+  };
+
+  if (card) {
+    data.cards = card.cards;
+  }
+
+  const requestOptions = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(data)
+  };
+
+  UrlFetchApp.fetch(WEBHOOK_URL, requestOptions);
+}
+
+
+
+
+
+
+
+function getRandomGifUrl() {
+  const folderId = '1z--3n1w8gsjLmZBQz0t7ditegWSlVW7N';
+  console.log(`Folder ID: ${folderId}`);
+  const folder = DriveApp.getFolderById(folderId);
+  console.log(`Folder: ${folder.getName()}`);
+  const files = folder.getFilesByType(MimeType.GIF);
+  const gifUrls = [];
+  
+  while (files.hasNext()) {
+    const file = files.next();
+    const url = file.getUrl();
+    console.log(`Found GIF file: ${url}`);
+    gifUrls.push(file.getId()); // Store the file ID instead of the URL
+  }
+  
+  const randomIndex = Math.floor(Math.random() * gifUrls.length);
+  const randomFileId = gifUrls[randomIndex]; // Get the random file ID
+  console.log(`Selected random GIF file ID: ${randomFileId}`);
+  
+  // Get the public URL of the image
+  const publicUrl = `https://drive.google.com/uc?export=view&id=${randomFileId}`;
+  console.log(`Selected random GIF public URL: ${publicUrl}`);
+  return publicUrl;
+}
