@@ -1,0 +1,342 @@
+// Update this constant with the new Google Sheet link every month
+const balloonsSheetUrl = "https://docs.google.com/spreadsheets/d/1sqmpKEYA6ZT9Rmz9WsRJYorjFs7v0csCJFJsQR81sXM/edit#gid=17686757";
+const WEBHOOK_URL = 'https://chat.googleapis.com/v1/spaces/AAAAhZJApxI/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=GBiWTg58f7cbS3EGvI9dZVqG2nsNgd7kKF0nkgKDbY8%3D';
+
+function simulateEdit(sheet, row, column, oldValue, newValue) {
+  const e = {
+    range: sheet.getRange(row, column),
+    oldValue: oldValue,
+    value: newValue,
+    source: SpreadsheetApp.getActive()
+  };
+
+  handleOnEdit(e); // Call the handleOnEdit function with the simulated event
+}
+
+function handleOverallTabEdit(e) {
+  const currentDate = new Date();
+  const overallSheet = e.source.getSheetByName('Overall');
+  const editedRow = e.range.getRow();
+  const editedColumn = e.range.getColumn();
+  const newValue = e.range.getValue();
+  const oldValue = e.oldValue;
+
+  if (editedColumn === 2) { // If Column B is edited
+    const workOrderNumber = newValue;
+    const threadId = getThreadIDFromBalloonsSheet(workOrderNumber);
+    overallSheet.getRange(editedRow, 14).setValue(threadId);
+  } else if (editedColumn === 6) { // If Column F is edited
+    const workOrderNumber = overallSheet.getRange(editedRow, 2).getValue();
+    const threadId = overallSheet.getRange(editedRow, 14).getValue();
+    const matchingRow = getMatchingRowInBalloonsSheet(workOrderNumber);
+    const balloonsSheet = SpreadsheetApp.openByUrl(balloonsSheetUrl);
+    const balloonsTab = balloonsSheet.getSheetByName('Balloons');
+
+    if (oldValue === 'Open' && newValue === 'Set Up') {
+  // If Column F changed from "Open" to "Set Up"
+  if (!balloonsTab.getRange(matchingRow, 25).getValue()) {
+    balloonsTab.getRange(matchingRow, 25).setValue(new Date());
+
+    // Send reply only when the date is added to Column Y
+    const workOrder = balloonsTab.getRange(matchingRow, 3).getValue();
+    const customer = balloonsTab.getRange(matchingRow, 2).getValue();
+    const description = balloonsTab.getRange(matchingRow, 6).getValue();
+    const replyText = `*Update:* Work Order ${workOrder} (${customer} ${description}) Set Up has been started.`;
+
+    // You can call sendReply here or simply move its content directly
+    sendReply({
+      threadId,
+      replyText,
+      sheetId: balloonsSheet.getId(),
+      sheetName: balloonsTab.getName(),
+      row: matchingRow,
+      column: 25,
+      WEBHOOK_URL: WEBHOOK_URL
+    });
+  }
+  } else if (oldValue === 'Set Up' && newValue === 'Running') {
+      // If Column F changed from "Set Up" to "Running"
+            if (!balloonsTab.getRange(matchingRow, 26).getValue()) {
+        balloonsTab.getRange(matchingRow, 26).setValue(currentDate);
+      }
+      if (!balloonsTab.getRange(matchingRow, 27).getValue()) {
+        balloonsTab.getRange(matchingRow, 27).setValue(currentDate);
+      }
+      const workOrder = balloonsTab.getRange(matchingRow, 3).getValue();
+      const customer = balloonsTab.getRange(matchingRow, 2).getValue();
+      const description = balloonsTab.getRange(matchingRow, 6).getValue();
+      const replyText = `*Update:* Work Order ${workOrder} (${customer} ${description}) has passed the Pre-Qualification Report review. The work order is now running.`;
+
+      sendReply({
+        threadId,
+        replyText,
+        sheetId: balloonsSheet.getId(),
+        sheetName: balloonsTab.getName(),
+        row: matchingRow,
+        column: 25,
+        WEBHOOK_URL: WEBHOOK_URL
+      });
+    } else if (newValue === 'Running/On Hold') {
+      // If Column F changed to "Running/On Hold"
+      const reason = Browser.inputBox('Please provide a reason for putting the work order on hold:');
+      overallSheet.getRange(editedRow, 13).setValue(reason);
+
+      const workOrder = balloonsTab.getRange(matchingRow, 3).getValue();
+      const customer = balloonsTab.getRange(matchingRow, 2).getValue();
+      const description = balloonsTab.getRange(matchingRow, 6).getValue();
+      const replyText = `*Update:* Work Order ${workOrder} (${customer} ${description}) has been put on hold. - ${reason}`;
+
+      sendReply({
+        threadId,
+        replyText,
+        sheetId: balloonsSheet.getId(),
+        sheetName: balloonsTab.getName(),
+        row: matchingRow,
+        column: 25,
+        WEBHOOK_URL: WEBHOOK_URL
+      });
+    } else if (oldValue === 'Running/On Hold' && newValue === 'Running') {
+      // If Column F changed from "Running/On Hold" to "Running"
+      const workOrder = balloonsTab.getRange(matchingRow, 3).getValue();
+      const customer = balloonsTab.getRange(matchingRow, 2).getValue();
+      const description = balloonsTab.getRange(matchingRow, 6).getValue();
+      const replyText = `*Update:* Work Order ${workOrder} (${customer} ${description}) has resumed production.`;
+
+      sendReply({
+        threadId,
+        replyText,
+        sheetId: balloonsSheet.getId(),
+        sheetName: balloonsTab.getName(),
+        row: matchingRow,
+        column: 25,
+        WEBHOOK_URL: WEBHOOK_URL
+      });
+    }
+  }
+}
+
+function getThreadIDFromBalloonsSheet(workOrderNumber) {
+  const matchingRow = getMatchingRowInBalloonsSheet(workOrderNumber);
+  if (matchingRow) {
+    const balloonsSheet = SpreadsheetApp.openByUrl(balloonsSheetUrl);
+    const balloonsTab = balloonsSheet.getSheetByName('Balloons');
+    return balloonsTab.getRange(matchingRow, 1).getValue();
+  }
+  return null;
+}
+
+function getMatchingRowInBalloonsSheet(workOrderNumber) {
+  const balloonsSheet = SpreadsheetApp.openByUrl(balloonsSheetUrl);
+  const balloonsTab = balloonsSheet.getSheetByName('Balloons');
+  const numRows = balloonsTab.getLastRow();
+  for (let row = 2; row <= numRows; row++) {
+    if (balloonsTab.getRange(row, 3).getValue() === workOrderNumber) {
+      return row;
+    }
+  }
+  return null;
+}
+
+
+
+
+function monitorOverallSheetForTrigger(e) {
+  const editedSheet = e.source.getSheetName();
+  
+  if (editedSheet !== 'Overall') {
+    monitorOverallSheet();
+  }
+}
+
+function monitorOverallSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const overallSheet = ss.getSheetByName('Overall');
+
+  const numRows = overallSheet.getLastRow();
+
+  for (let row = 2; row <= numRows; row++) {
+    const workOrderNumber = overallSheet.getRange(row, 2).getValue();
+    if (workOrderNumber) {
+      const dataToCopy = overallSheet.getRange(row, 7, 1, 3).getValues();
+      updateBalloonsSheet(workOrderNumber, dataToCopy);
+    }
+  }
+}
+
+function updateBalloonsSheet(workOrderNumber, dataToCopy) {
+  const balloonsSheet = SpreadsheetApp.openByUrl(balloonsSheetUrl);
+  const balloonsTab = balloonsSheet.getSheetByName('Balloons');
+  const balloonsNumRows = balloonsTab.getLastRow();
+
+  for (let row = 2; row <= balloonsNumRows; row++) {
+    const balloonsWorkOrderNumber = balloonsTab.getRange(row, 3).getValue();
+    if (workOrderNumber === balloonsWorkOrderNumber) {
+      balloonsTab.getRange(row, 28, 1, 1).setValues([[dataToCopy[0][0]]]);
+      balloonsTab.getRange(row, 29, 1, 1).setValues([[dataToCopy[0][1]]]);
+      balloonsTab.getRange(row, 31, 1, 1).setValues([[dataToCopy[0][2]]]);
+    }
+  }
+}
+
+function createOnEditTrigger() {
+  const ss = SpreadsheetApp.getActive();
+  ScriptApp.newTrigger('handleOnEdit')
+    .forSpreadsheet(ss)
+    .onEdit()
+    .create();
+}
+
+function handleOnEdit(e) {
+  const editedSheet = e.source.getSheetName();
+  const sheet = e.range.getSheet();
+  const sheetName = sheet.getName();
+
+  if (sheetName === 'Overall') {
+    handleOverallTabEdit(e);
+  } else {
+    updateBalloonsSheet(e); // Call a new function for edits on other sheets
+  }
+  checkRunningStatus(); // Call this function on every edit
+}
+
+function checkRunningStatus() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const overallSheet = ss.getSheetByName('Overall');
+  const numRows = overallSheet.getLastRow();
+  
+  for (let row = 2; row <= numRows; row++) {
+    const status = overallSheet.getRange(row, 6).getValue();
+    Logger.log(`Processing row ${row} with status "${status}"`);
+    if (status === 'Running') {
+      const colG = overallSheet.getRange(row, 7).getValue();
+      const colE = overallSheet.getRange(row, 5).getValue();
+      
+      if (colG === colE) {
+        // 1. Change Column F of this row to "Closing"
+        overallSheet.getRange(row, 6).setValue('Closing (Inspector Review)');
+        Logger.log(`Set status to "Closing (Inspector Review)" for row ${row}`);
+        
+        // 2. Get the job number from Column B
+        const workOrderNumber = overallSheet.getRange(row, 2).getValue();
+        Logger.log(`Got job number "${workOrderNumber}" for row ${row}`);
+        
+        // 3. Go to the external sheet and "Balloons" tab
+        const balloonsSheet = SpreadsheetApp.openByUrl(balloonsSheetUrl);
+        const balloonsTab = balloonsSheet.getSheetByName('Balloons');
+        Logger.log(`Opened sheet "${balloonsTab.getName()}"`);
+        
+        // 4. Search Column C of the external sheet for the job number
+        const numRowsBalloons = balloonsTab.getLastRow();
+        for (let rowBalloons = 2; rowBalloons <= numRowsBalloons; rowBalloons++) {
+          if (balloonsTab.getRange(rowBalloons, 3).getValue() === workOrderNumber) {
+            // Once matching, put the current date and time into Column AI of that row
+            balloonsTab.getRange(rowBalloons, 35).setValue(new Date());
+            Logger.log(`Set Column AI to current date for row ${rowBalloons}`);
+            Logger.log(`Job number is still "${workOrderNumber}" for row ${row}`);
+            
+            // 5. Send a reply using the sendReply function
+            const threadId = overallSheet.getRange(row, 14).getValue();
+            const customer = balloonsTab.getRange(rowBalloons, 2).getValue();
+            const description = balloonsTab.getRange(rowBalloons, 6).getValue();
+            const replyText = `*Update:* Work Order ${workOrderNumber} (${customer} ${description}) has reached the required quantity and is now closing.`;
+
+            const card = {
+            title: "Inspector Tasks",
+            body: "1. Complete All Pending Testing\n2. Bag, Seal and Label Retainers. Record quantity on the Inspection Sheet (FM-022).\n3. Print, Review and Sign Final Inspection Report. (Correct Errors and Reprint as Necessary).",
+            button: {
+              text: "Click Here When Completed",
+              url: "https://script.google.com/a/macros/confluentmedical.com/s/AKfycbwFKtBEpHRbeVLUncKw_wapKJbmzcm9sGGV-ZyEtmfp6MEltuxkB8y_HxOyIfpatxm8/exec" + "?action=triggerEngineerTechnicianReview&workOrderNumber=" + encodeURIComponent(workOrderNumber),
+            }
+            };
+
+
+
+            sendReply({
+              threadId,
+              replyText,
+              sheetId: balloonsSheet.getId(),
+              sheetName: balloonsTab.getName(),
+              row: rowBalloons,
+              column: 35, // Updated column to AI
+              WEBHOOK_URL: WEBHOOK_URL,
+              card: card,
+            });
+
+
+            
+
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
+function sendReply(options) {
+  const { threadId, replyText, technicianEmail, engineerEmail, sheetId, sheetName, row, WEBHOOK_URL, card } = options;
+  
+  const data = {
+    "text": replyText,
+    "thread": {
+      "name": threadId
+    }
+  };
+
+  if (card) {
+    const buttonWidget = card.button ? {
+      "buttons": [
+        {
+          "textButton": {
+            "text": card.button.text,
+            "onClick": {
+              "openLink": {
+                "url": card.button.url
+              }
+            }
+          }
+        }
+      ]
+    } : null;
+
+    data.cards = [
+      {
+        "sections": [
+          {
+            "widgets": [
+              {
+                "textParagraph": {
+                  "text": `<b>${card.title}</b>`
+                }
+              },
+              {
+                "textParagraph": {
+                  "text": card.body
+                }
+              },
+              buttonWidget
+            ].filter(Boolean)
+          }
+        ]
+      }
+    ];
+  }
+
+  const requestOptions = {
+    method: 'post',
+    contentType: 'application/json; charset=UTF-8', // Change this line
+    payload: JSON.stringify(data)
+  };
+
+  // Log the received buttonUrl
+  if (card && card.button) {
+    Logger.log("Received buttonUrl: " + card.button.url);
+  }
+
+  // Log the URL being fetched and request options using string concatenation
+  Logger.log("Fetching URL: " + WEBHOOK_URL);
+  Logger.log("Request options: " + JSON.stringify(requestOptions));
+
+  UrlFetchApp.fetch(WEBHOOK_URL, requestOptions);
+}
+
